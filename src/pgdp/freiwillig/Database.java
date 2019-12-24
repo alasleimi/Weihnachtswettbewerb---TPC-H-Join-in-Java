@@ -38,12 +38,8 @@ public class Database {
 
 
                         return new Customer(Integer.parseInt(d[1].replaceAll("\\D", ""))
-                                , d[2].toCharArray()
-                                , Integer.parseInt(d[3])
-                                , d[4].toCharArray()
-                                , Float.parseFloat(d[5])
                                 , d[6]
-                                , d[7].toCharArray());
+                        );
                     });
         } catch (Exception e) {
 
@@ -61,13 +57,7 @@ public class Database {
 
 
                         return new LineItem(Integer.parseInt(d[0]),
-                                Integer.parseInt(d[1]), Integer.parseInt(d[2]), Integer.parseInt(d[3]),
-                                Integer.parseInt(d[4]) * 100,
-                                Float.parseFloat(d[5]),
-                                Float.parseFloat(d[6]), Float.parseFloat(d[7]), d[8].charAt(0),
-                                d[9].charAt(0), LocalDate.parse(d[10]),
-                                LocalDate.parse(d[11]), LocalDate.parse(d[12]), d[13].toCharArray(),
-                                        d[14].toCharArray(), d[15].toCharArray()
+                                Integer.parseInt(d[4]) * 100
                                 );
                             }
                     );
@@ -86,10 +76,7 @@ public class Database {
                     .map(x -> {
                         String[] d = x.split("\\|");
 
-                        return new Order(Integer.parseInt(d[0]), Integer.parseInt(d[1].replaceAll("\\D", ""))
-                                , d[2].charAt(0),
-                                Float.parseFloat(d[3]), LocalDate.parse(d[4]),
-                                d[5].toCharArray(), d[6].toCharArray(), Integer.parseInt(d[7]), d[8].toCharArray());
+                        return new Order(Integer.parseInt(d[0]), Integer.parseInt(d[1].replaceAll("\\D", "")));
                     });
         } catch (IOException e) {
 
