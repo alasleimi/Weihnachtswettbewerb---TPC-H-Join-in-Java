@@ -15,36 +15,15 @@ public class Database {
     // TODO have fun :)
 
     static private Map<String, Long> averageQuantityPerMarketSegment;
+    private static boolean cache = false;
 
-    private static Path baseDataDirectory;
+    private static Path baseDataDirectory = Paths.get("data");
 
 
     public static void setBaseDataDirectory(Path _baseDataDirectory) {
-        if (!_baseDataDirectory.equals(baseDataDirectory)) {
-            Database.baseDataDirectory = _baseDataDirectory;
 
-
-            var mktsegmentPerCustomer = processInputFileCustomer().collect(
-                    Collectors.groupingBy(x -> x.custKey, Collectors.mapping(x -> x.mktsegment, Collectors.joining())
-                    ));
-
-            var mktsegmentPerOrder = processInputFileOrders().collect(
-                    Collectors.groupingBy(x -> x.orderKey,
-                            Collectors.mapping(x -> mktsegmentPerCustomer.get(x.custKey),
-                                    Collectors.joining())
-                    )
-            );
-
-            averageQuantityPerMarketSegment = processInputFileLineItem()
-                    .collect(Collectors.groupingBy(x -> mktsegmentPerOrder.get(x.orderKey),
-                            Collectors.teeing(
-                                    Collectors.summingLong(x -> x.quantity),
-                                    Collectors.counting(),
-                                    (s, c) -> s / c
-
-                            )
-                    ));
-        }
+        Database.baseDataDirectory = _baseDataDirectory;
+        cache = false;
 
 
     }
@@ -118,10 +97,6 @@ public class Database {
 
 
     public Database() {
-
-
-
-
     }
 
     public static void main(String[] args) {
@@ -130,7 +105,29 @@ public class Database {
     }
 
     public long getAverageQuantityPerMarketSegment(String marketsegment) {
-        if (baseDataDirectory == null) setBaseDataDirectory(Paths.get("data"));
+        if (!cache) {
+            var mktsegmentPerCustomer = processInputFileCustomer().collect(
+                    Collectors.groupingBy(x -> x.custKey, Collectors.mapping(x -> x.mktsegment, Collectors.joining())
+                    ));
+
+            var mktsegmentPerOrder = processInputFileOrders().collect(
+                    Collectors.groupingBy(x -> x.orderKey,
+                            Collectors.mapping(x -> mktsegmentPerCustomer.get(x.custKey),
+                                    Collectors.joining())
+                    )
+            );
+
+            averageQuantityPerMarketSegment = processInputFileLineItem()
+                    .collect(Collectors.groupingBy(x -> mktsegmentPerOrder.get(x.orderKey),
+                            Collectors.teeing(
+                                    Collectors.summingLong(x -> x.quantity),
+                                    Collectors.counting(),
+                                    (s, c) -> s / c
+
+                            )
+                    ));
+            cache = true;
+        }
         return averageQuantityPerMarketSegment.get(marketsegment);
     }
 }
