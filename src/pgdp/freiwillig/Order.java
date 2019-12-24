@@ -52,4 +52,12 @@ public class Order {
     public void output() {
         System.out.println(this.toString());
     }
+
+    @Override
+    public String toString() {
+        return "Order{" +
+                "orderKey=" + orderKey +
+                ", custKey=" + custKey +
+                '}';
+    }
 }

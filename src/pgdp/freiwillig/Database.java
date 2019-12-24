@@ -56,9 +56,9 @@ public class Database {
                         String[] d = x.split("\\|");
 
 
-                        return new LineItem(Integer.parseInt(d[0]),
+                        return new LineItem(d[0],
                                 Integer.parseInt(d[4]) * 100
-                                );
+                        );
                             }
                     );
         } catch (Exception e) {
@@ -69,15 +69,29 @@ public class Database {
         // Für die Quantity der Lineitems bitte Integer.parseInt(str) * 100 verwenden !
     }
 
-    public static Stream<Order> processInputFileOrders() {
+    public static Map<String, Integer> custPerOrder() {
         try {
             return Files.lines(baseDataDirectory.resolve("orders.tbl")).
                     parallel()
-                    .map(x -> {
-                        String[] d = x.split("\\|");
+                    .map(x -> x.split("\\|"))
+                    .collect(Collectors.toConcurrentMap(x -> x[0], x -> Integer.parseInt(x[1])));
 
-                        return new Order(Integer.parseInt(d[0]), Integer.parseInt(d[1].replaceAll("\\D", "")));
-                    });
+
+        } catch (IOException e) {
+
+            throw new RuntimeException("file not found");
+        }
+        // TODO
+    }
+
+    public static Map<Integer, String> segPerCust() {
+        try {
+            return Files.lines(baseDataDirectory.resolve("customer.tbl")).
+                    parallel()
+                    .map(x -> x.split("\\|"))
+                    .collect(Collectors.toConcurrentMap(x -> Integer.parseInt(x[1].replaceAll("\\D", "")), x -> x[6]));
+
+
         } catch (IOException e) {
 
             throw new RuntimeException("file not found");
@@ -96,19 +110,11 @@ public class Database {
 
     public long getAverageQuantityPerMarketSegment(String marketsegment) {
         if (!cache) {
-            var mktsegmentPerCustomer = processInputFileCustomer().collect(
-                    Collectors.groupingByConcurrent(x -> x.custKey, Collectors.mapping(x -> x.mktsegment, Collectors.joining())
-                    ));
-
-            var mktsegmentPerOrder = processInputFileOrders().collect(
-                    Collectors.groupingByConcurrent(x -> x.orderKey,
-                            Collectors.mapping(x -> mktsegmentPerCustomer.get(x.custKey),
-                                    Collectors.joining())
-                    )
-            );
+            var a = custPerOrder();
+            var b = segPerCust();
 
             averageQuantityPerMarketSegment = processInputFileLineItem()
-                    .collect(Collectors.groupingByConcurrent(x -> mktsegmentPerOrder.get(x.orderKey),
+                    .collect(Collectors.groupingByConcurrent(x -> b.get(a.get(x.orderKey)),
                             Collectors.teeing(
                                     Collectors.summingLong(x -> x.quantity),
                                     Collectors.counting(),

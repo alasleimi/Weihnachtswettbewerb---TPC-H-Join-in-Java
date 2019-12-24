@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.Arrays;
 
 public class LineItem {
-    int orderKey;
+    String orderKey;
     int quantity;
 
     /**private int partKey;
@@ -67,8 +67,16 @@ public class LineItem {
      public void output() {
      System.out.println(this.toString());
      }**/
-    LineItem(int orderKey, int quantity) {
+    LineItem(String orderKey, int quantity) {
         this.orderKey = orderKey;
         this.quantity = quantity;
+    }
+
+    @Override
+    public String toString() {
+        return "LineItem{" +
+                "orderKey='" + orderKey + '\'' +
+                ", quantity=" + quantity +
+                '}';
     }
 }
