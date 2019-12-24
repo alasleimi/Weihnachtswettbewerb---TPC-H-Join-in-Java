@@ -18,11 +18,11 @@ public class Database {
 
     private static Path baseDataDirectory = Paths.get("data");
 
-    /**
-     * public static void setBaseDataDirectory(Path baseDataDirectory) {
-     * Database.baseDataDirectory = baseDataDirectory;
-     * }
-     **/
+
+    public static void setBaseDataDirectory(Path baseDataDirectory) {
+        Database.baseDataDirectory = baseDataDirectory;
+    }
+
 
     public static Stream<Customer> processInputFileCustomer() {
         try {
