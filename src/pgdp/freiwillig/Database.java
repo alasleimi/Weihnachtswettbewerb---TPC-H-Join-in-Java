@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -59,7 +60,8 @@ public class Database {
                         //System.out.println(answer[0] + " " + answer[1]);
                         return answer;
                     })
-                    .collect(Collectors.toConcurrentMap(x -> parseInt(x[0], 0, x[0].length()), x -> x[1], (x, v) -> v,
+                    .collect(Collectors.toConcurrentMap(x -> parseInt(x[0], 0, x[0].length()),
+                            x -> x[1], (x, v) -> v,
                             () -> new ConcurrentHashMap<Integer, String>(1 << 24)));
 
 
@@ -167,12 +169,17 @@ public class Database {
                             return answer;
                         }).collect(Collectors.groupingByConcurrent(x -> a.get(x[0]),
                                 () -> new ConcurrentHashMap<>(1_000_000),
-                                Collectors.teeing(
-                                        Collectors.summingLong(x -> x[1]),
-                                        Collectors.counting(),
-                                        (s, c) -> (100 * s) / c
-
-                                )
+                                Collector.of(() -> new long[2],
+                                        (u, t) -> {
+                                            u[0] += t[1];
+                                            ++u[1];
+                                        },
+                                        (u, b) -> {
+                                            u[0] += b[0];
+                                            u[1] += b[1];
+                                            return u;
+                                        },
+                                        u -> (100 * u[0]) / u[1])
 
                         ));
             } catch (IOException e) {
