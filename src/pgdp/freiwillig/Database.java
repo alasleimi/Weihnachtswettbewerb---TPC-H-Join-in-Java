@@ -21,8 +21,21 @@ public class Database {
     // TODO have fun :)
 
     static private Map<String, Long> averageQuantityPerMarketSegment;
-    static private ConcurrentHashMap<String, LongAdder> quantPerMarketSegment;
-    static private ConcurrentHashMap<String, LongAdder> countPerMarketSegment;
+    static private ConcurrentHashMap<String, Pair> avgPerMarketSegment;
+
+    class Pair {
+        public LongAdder fst, snd;
+
+        Pair() {
+            fst = new LongAdder();
+            snd = new LongAdder();
+        }
+
+        public long ans() {
+            return (100 * fst.longValue()) / snd.longValue();
+        }
+    }
+
     private static boolean cache = false;
 
     private static Path baseDataDirectory = Paths.get("C:\\Users\\ACER\\Downloads\\data");
@@ -144,8 +157,8 @@ public class Database {
                         .collect(Collectors.toConcurrentMap(x -> x[0], x -> sPC.get(x[1]), (x, v) -> v,
                                 () -> new ConcurrentHashMap<Integer, String>(1 << 24)));
 
-                countPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
-                quantPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
+                avgPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
+                //quantPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
                 Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
                         .unordered()
                         .parallel()
@@ -189,9 +202,9 @@ public class Database {
                  )
                  );**/
                         .forEach(x -> {
-                            var tmp = a.get(x[0]);
-                            quantPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).add(x[1]);
-                            countPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).increment();
+                            var tmp = avgPerMarketSegment.computeIfAbsent(a.get(x[0]), y -> new Pair());
+                            tmp.fst.add(x[1]);
+                            tmp.snd.increment();
 
                         });
             } catch (IOException e) {
@@ -201,7 +214,7 @@ public class Database {
             cache = true;
         }
         //System.out.println(averageQuantityPerMarketSegment.size());
-        return (100 * quantPerMarketSegment.get(marketsegment).longValue()) /
-                countPerMarketSegment.get(marketsegment).longValue();
+
+        return avgPerMarketSegment.get(marketsegment).ans();
     }
 }
