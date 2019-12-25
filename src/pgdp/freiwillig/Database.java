@@ -126,9 +126,9 @@ public class Database {
     public long getAverageQuantityPerMarketSegment(String marketsegment) {
         if (!cache) {
             var a = custPerOrder();
-            System.out.println(a.size());
+            //System.out.println(a.size());
             var b = segPerCust();
-            System.out.println(b.size());
+            // System.out.println(b.size());
             try {
                 averageQuantityPerMarketSegment = Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
                         .unordered()
@@ -170,7 +170,7 @@ public class Database {
 
             cache = true;
         }
-        System.out.println(averageQuantityPerMarketSegment.size());
+        //System.out.println(averageQuantityPerMarketSegment.size());
         return averageQuantityPerMarketSegment.get(marketsegment);
     }
 }
