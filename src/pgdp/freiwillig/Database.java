@@ -41,7 +41,7 @@ public class Database {
                     .parallel()
                     .map(x -> x.split("\\|"))
                     .collect(Collectors.toConcurrentMap(x -> x[0], x -> parseInt(x[1]), (x, v) -> v,
-                            () -> new ConcurrentHashMap<String, Integer>(2_000_000)));
+                            () -> new ConcurrentHashMap<String, Integer>(15_000_000)));
 
 
         } catch (IOException e) {
@@ -80,7 +80,7 @@ public class Database {
                         return answer;
                     })
                     .collect(Collectors.toConcurrentMap(x -> parseInt(x[0]), x -> x[1], (x, v) -> v,
-                            () -> new ConcurrentHashMap<Integer, String>(2_000_000)));
+                            () -> new ConcurrentHashMap<Integer, String>(3_000_000)));
 
 
         } catch (IOException e) {
@@ -126,7 +126,9 @@ public class Database {
     public long getAverageQuantityPerMarketSegment(String marketsegment) {
         if (!cache) {
             var a = custPerOrder();
+            System.out.println(a.size());
             var b = segPerCust();
+            System.out.println(b.size());
             try {
                 averageQuantityPerMarketSegment = Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
                         .unordered()
@@ -168,6 +170,7 @@ public class Database {
 
             cache = true;
         }
+        System.out.println(averageQuantityPerMarketSegment.size());
         return averageQuantityPerMarketSegment.get(marketsegment);
     }
 }
