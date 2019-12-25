@@ -20,7 +20,7 @@ public class Database {
     static private ConcurrentMap<String, Long> averageQuantityPerMarketSegment;
     private static boolean cache = false;
 
-    private static Path baseDataDirectory = Paths.get("C:\\Users\\ACER\\Downloads\\data");
+    private static Path baseDataDirectory = Paths.get("data");
 
 
     public static void setBaseDataDirectory(Path _baseDataDirectory) {
@@ -41,7 +41,7 @@ public class Database {
                     .parallel()
                     .map(x -> x.split("\\|"))
                     .collect(Collectors.toConcurrentMap(x -> x[0], x -> parseInt(x[1]), (x, v) -> v,
-                            () -> new ConcurrentHashMap<String, Integer>(1 << 30)));
+                            () -> new ConcurrentHashMap<String, Integer>(1 << 23)));
 
 
         } catch (IOException e) {
@@ -80,7 +80,7 @@ public class Database {
                         return answer;
                     })
                     .collect(Collectors.toConcurrentMap(x -> parseInt(x[0]), x -> x[1], (x, v) -> v,
-                            () -> new ConcurrentHashMap<Integer, String>(1 << 29)));
+                            () -> new ConcurrentHashMap<Integer, String>(1 << 23)));
 
 
         } catch (IOException e) {
