@@ -20,7 +20,7 @@ import java.util.stream.Stream;
 public class Database {
     // TODO have fun :)
 
-    static private Map<String, Long> averageQuantityPerMarketSegment;
+
     static private ConcurrentHashMap<String, LongAdder> quantPerMarketSegment;
     static private ConcurrentHashMap<String, LongAdder> countPerMarketSegment;
     private static boolean cache = false;
