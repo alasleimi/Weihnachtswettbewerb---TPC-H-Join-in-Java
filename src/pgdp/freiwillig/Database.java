@@ -2,6 +2,7 @@ package pgdp.freiwillig;
 
 // TODO Imports
 
+import javax.imageio.IIOException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,26 +49,6 @@ public class Database {
         // TODO
     }
 
-    public static Stream<LineItem> processInputFileLineItem() {
-        try {
-            return Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
-                    .parallel()
-                    .map(x -> {
-                        String[] d = x.split("\\|");
-
-
-                        return new LineItem(d[0],
-                                Integer.parseInt(d[4]) * 100
-                        );
-                            }
-                    );
-        } catch (Exception e) {
-
-            throw new RuntimeException("file not found");
-
-        }
-        // Für die Quantity der Lineitems bitte Integer.parseInt(str) * 100 verwenden !
-    }
 
     public static Map<String, Integer> custPerOrder() {
         try {
@@ -89,7 +70,8 @@ public class Database {
             return Files.lines(baseDataDirectory.resolve("customer.tbl")).
                     parallel()
                     .map(x -> x.split("\\|"))
-                    .collect(Collectors.toConcurrentMap(x -> Integer.parseInt(x[1].replaceAll("\\D", "")), x -> x[6]));
+                    .collect(Collectors.toConcurrentMap(x -> Integer.parseInt(x[1]
+                            .replaceAll("\\D", "")), x -> x[6]));
 
 
         } catch (IOException e) {
@@ -112,16 +94,21 @@ public class Database {
         if (!cache) {
             var a = custPerOrder();
             var b = segPerCust();
+            try {
+                averageQuantityPerMarketSegment = Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
+                        .parallel()
+                        .map(x -> x.split("\\|")).collect(Collectors.groupingByConcurrent(x -> b.get(a.get(x[0])),
+                                Collectors.teeing(
+                                        Collectors.summingLong(x -> Integer.parseInt(x[4]) * 100),
+                                        Collectors.counting(),
+                                        (s, c) -> s / c
 
-            averageQuantityPerMarketSegment = processInputFileLineItem()
-                    .collect(Collectors.groupingByConcurrent(x -> b.get(a.get(x.orderKey)),
-                            Collectors.teeing(
-                                    Collectors.summingLong(x -> x.quantity),
-                                    Collectors.counting(),
-                                    (s, c) -> s / c
+                                )
+                        ));
+            } catch (IOException e) {
+                throw new RuntimeException("no file");
+            }
 
-                            )
-                    ));
             cache = true;
         }
         return averageQuantityPerMarketSegment.get(marketsegment);
