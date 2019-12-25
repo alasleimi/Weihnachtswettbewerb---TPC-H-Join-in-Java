@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -18,7 +19,7 @@ import java.util.stream.Stream;
 public class Database {
     // TODO have fun :)
 
-    static private ConcurrentMap<String, Long> averageQuantityPerMarketSegment;
+    static private Map<String, Long> averageQuantityPerMarketSegment;
     private static boolean cache = false;
 
     private static Path baseDataDirectory = Paths.get("C:\\Users\\ACER\\Downloads\\data");
@@ -167,8 +168,8 @@ public class Database {
                             }
                             //System.out.println(answer[0] + " " + answer[1]);
                             return answer;
-                        }).collect(Collectors.groupingByConcurrent(x -> a.get(x[0]),
-                                () -> new ConcurrentHashMap<>(1_000_000),
+                        }).collect(Collectors.groupingBy(x -> a.get(x[0]),
+                                () -> new HashMap<>(1_000_000),
                                 Collector.of(() -> new long[2],
                                         (u, t) -> {
                                             u[0] += t[1];
@@ -181,7 +182,8 @@ public class Database {
                                         },
                                         u -> (100 * u[0]) / u[1])
 
-                        ));
+                                )
+                        );
             } catch (IOException e) {
                 throw new RuntimeException("no file");
             }
