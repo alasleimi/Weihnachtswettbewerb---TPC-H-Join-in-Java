@@ -46,7 +46,7 @@ public class Database {
                         int key = 0;
                         int j = 0;
                         int o = 0;
-                        for (int i = 0; i < x.length(); i++) {
+                        for (int i = 0; ; i++) {
 
                             if (x.charAt(i) == '|') {
                                 if (j == 1) {
@@ -106,6 +106,7 @@ public class Database {
         return q;
     }
 
+
     public long getAverageQuantityPerMarketSegment(String marketsegment) {
         if (!cache) {
             //var a = custPerOrder();
@@ -114,21 +115,21 @@ public class Database {
             // System.out.println(b.size());
             try {
 
-
-                var a = Files.lines(baseDataDirectory.resolve("orders.tbl"))
+                ConcurrentHashMap<Integer, String> a = new ConcurrentHashMap<>(1 << 24);
+                Files.lines(baseDataDirectory.resolve("orders.tbl"))
                         .unordered()
                         .parallel()
-                        .map(x -> {
-                            int[] answer = new int[2];
+                        .forEach(x -> {
+                            int key = 0;
                             int j = 0;
                             int o = 0;
                             for (int i = 0, n = x.length(); i < n; i++) {
 
                                 if (x.charAt(i) == '|') {
                                     if (j == 0) {
-                                        answer[0] = parseInt(x, o, i);
+                                        key = parseInt(x, o, i);
                                     } else if (j == 1) {
-                                        answer[1] = parseInt(x, o, i);
+                                        a.put(key, sPC.get(parseInt(x, o, i)));
                                         break;
                                     }
                                     o = i + 1;
@@ -138,31 +139,30 @@ public class Database {
 
 
                             }
-                            //System.out.println(answer[0] + " " + answer[1]);
-                            return answer;
 
+                        });
 
-                        })
-                        .collect(Collectors.toConcurrentMap(x -> x[0], x -> sPC.get(x[1]), (x, v) -> v,
-                                () -> new ConcurrentHashMap<Integer, String>(1 << 24)));
 
                 countPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
                 quantPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
                 Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
                         .unordered()
                         .parallel()
-                        .map(x -> {
+                        .forEach(x -> {
                             //custom split
-                            int[] answer = new int[2];
+                            String key = null;
                             int j = 0;
                             int o = 0;
                             for (int i = 0, n = x.length(); i < n; i++) {
 
                                 if (x.charAt(i) == '|') {
                                     if (j == 0) {
-                                        answer[0] = parseInt(x, o, i);
+                                        key = a.get(parseInt(x, o, i));
                                     } else if (j == 4) {
-                                        answer[1] = parseInt(x, o, i);
+                                        quantPerMarketSegment.computeIfAbsent(key, y -> new LongAdder()).add(
+                                                parseInt(x, o, i)
+                                        );
+                                        countPerMarketSegment.computeIfAbsent(key, y -> new LongAdder()).increment();
                                         break;
                                     }
                                     o = i + 1;
@@ -173,13 +173,8 @@ public class Database {
 
                             }
                             //System.out.println(answer[0] + " " + answer[1]);
-                            return answer;
-                        }).forEach(x -> {
-                    var tmp = a.get(x[0]);
-                    quantPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).add(x[1]);
-                    countPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).increment();
 
-                });
+                        });
             } catch (IOException e) {
                 throw new RuntimeException("no file");
             }
