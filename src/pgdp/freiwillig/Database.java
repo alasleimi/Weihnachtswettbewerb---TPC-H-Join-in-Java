@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -39,7 +40,8 @@ public class Database {
                     .unordered()
                     .parallel()
                     .map(x -> x.split("\\|"))
-                    .collect(Collectors.toConcurrentMap(x -> x[0], x -> parseInt(x[1])));
+                    .collect(Collectors.toConcurrentMap(x -> x[0], x -> parseInt(x[1]), (x, v) -> v,
+                            () -> new ConcurrentHashMap<String, Integer>(300_000)));
 
 
         } catch (IOException e) {
@@ -77,7 +79,8 @@ public class Database {
                         //System.out.println(answer[0] + " " + answer[1]);
                         return answer;
                     })
-                    .collect(Collectors.toConcurrentMap(x -> parseInt(x[0]), x -> x[1]));
+                    .collect(Collectors.toConcurrentMap(x -> parseInt(x[0]), x -> x[1], (x, v) -> v,
+                            () -> new ConcurrentHashMap<Integer, String>(300_000)));
 
 
         } catch (IOException e) {
