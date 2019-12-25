@@ -80,7 +80,7 @@ public class Database {
                         return answer;
                     })
                     .collect(Collectors.toConcurrentMap(x -> parseInt(x[0]), x -> x[1], (x, v) -> v,
-                            () -> new ConcurrentHashMap<Integer, String>(1 << 30)));
+                            () -> new ConcurrentHashMap<Integer, String>(1 << 29)));
 
 
         } catch (IOException e) {
