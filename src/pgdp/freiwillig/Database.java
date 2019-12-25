@@ -41,7 +41,7 @@ public class Database {
                     .parallel()
                     .map(x -> x.split("\\|"))
                     .collect(Collectors.toConcurrentMap(x -> x[0], x -> parseInt(x[1]), (x, v) -> v,
-                            () -> new ConcurrentHashMap<String, Integer>(300_000)));
+                            () -> new ConcurrentHashMap<String, Integer>(1_000_000)));
 
 
         } catch (IOException e) {
@@ -80,7 +80,7 @@ public class Database {
                         return answer;
                     })
                     .collect(Collectors.toConcurrentMap(x -> parseInt(x[0]), x -> x[1], (x, v) -> v,
-                            () -> new ConcurrentHashMap<Integer, String>(300_000)));
+                            () -> new ConcurrentHashMap<Integer, String>(1_000_000)));
 
 
         } catch (IOException e) {
