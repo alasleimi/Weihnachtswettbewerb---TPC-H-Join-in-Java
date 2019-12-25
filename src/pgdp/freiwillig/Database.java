@@ -20,7 +20,7 @@ public class Database {
     static private ConcurrentMap<String, Long> averageQuantityPerMarketSegment;
     private static boolean cache = false;
 
-    private static Path baseDataDirectory = Paths.get("data");
+    private static Path baseDataDirectory = Paths.get("C:\\Users\\ACER\\Downloads\\data");
 
 
     public static void setBaseDataDirectory(Path _baseDataDirectory) {
@@ -32,16 +32,14 @@ public class Database {
     }
 
 
-
-
-    public static Map<String, Integer> custPerOrder() {
+    public static Map<Integer, Integer> custPerOrder() {
         try {
             return Files.lines(baseDataDirectory.resolve("orders.tbl"))
                     .unordered()
                     .parallel()
                     .map(x -> x.split("\\|"))
-                    .collect(Collectors.toConcurrentMap(x -> x[0], x -> parseInt(x[1]), (x, v) -> v,
-                            () -> new ConcurrentHashMap<String, Integer>(1 << 23)));
+                    .collect(Collectors.toConcurrentMap(x -> parseInt(x[0]), x -> parseInt(x[1]), (x, v) -> v,
+                            () -> new ConcurrentHashMap<Integer, Integer>(1 << 23)));
 
 
         } catch (IOException e) {
@@ -109,13 +107,12 @@ public class Database {
     static int parseInt(String s) {
         int i = 0;
         int q = 0;
-        for (; s.charAt(i) > '9' || s.charAt(i) < '1'; ++i) ;
+        char c;
+        for (c = s.charAt(i); c > '9' || c < '1'; c = s.charAt(++i)) ;
         for (; i < s.length(); ++i) {
-
-            if (s.charAt(i) <= '9' || s.charAt(i) >= '1') {
-                q *= 10;
-                q += s.charAt(i) - '0';
-            }
+            c = s.charAt(i);
+            q *= 10;
+            q += c - '0';
 
         }
         return q;
@@ -125,11 +122,19 @@ public class Database {
 
     public long getAverageQuantityPerMarketSegment(String marketsegment) {
         if (!cache) {
-            var a = custPerOrder();
+            //var a = custPerOrder();
             //System.out.println(a.size());
             var b = segPerCust();
             // System.out.println(b.size());
             try {
+
+                var a = Files.lines(baseDataDirectory.resolve("orders.tbl"))
+                        .unordered()
+                        .parallel()
+                        .map(x -> x.split("\\|"))
+                        .collect(Collectors.toConcurrentMap(x -> parseInt(x[0]), x -> b.get(parseInt(x[1])), (x, v) -> v,
+                                () -> new ConcurrentHashMap<Integer, String>(1 << 23)));
+
                 averageQuantityPerMarketSegment = Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
                         .unordered()
                         .parallel()
@@ -155,12 +160,12 @@ public class Database {
                             }
                             //System.out.println(answer[0] + " " + answer[1]);
                             return answer;
-                        }).collect(Collectors.groupingByConcurrent(x -> b.get(a.get(x[0])),
+                        }).collect(Collectors.groupingByConcurrent(x -> a.get(parseInt(x[0])),
                                 () -> new ConcurrentHashMap<>(1_000_000),
                                 Collectors.teeing(
-                                        Collectors.summingLong(x -> parseInt(x[1]) * 100),
+                                        Collectors.summingLong(x -> parseInt(x[1])),
                                         Collectors.counting(),
-                                        (s, c) -> s / c
+                                        (s, c) -> (100 * s) / c
 
                                 )
                         ));
