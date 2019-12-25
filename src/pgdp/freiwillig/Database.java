@@ -21,8 +21,21 @@ public class Database {
     // TODO have fun :)
 
 
-    static private ConcurrentHashMap<String, LongAdder> quantPerMarketSegment;
-    static private ConcurrentHashMap<String, LongAdder> countPerMarketSegment;
+    private static ConcurrentMap<String, Pair> avg;
+
+    static class Pair {
+        LongAdder fst, snd;
+
+        Pair() {
+            fst = new LongAdder();
+            snd = new LongAdder();
+        }
+
+        long ans() {
+            return (100 * fst.longValue()) / snd.longValue();
+        }
+    }
+
     private static boolean cache = false;
 
     private static Path baseDataDirectory = Paths.get("C:\\Users\\ACER\\Downloads\\data");
@@ -36,9 +49,11 @@ public class Database {
 
     }
 
-    public static ConcurrentHashMap<Integer, String> segPerCust() {
+    public static Pair[] segPerCust() {
         try {
-            ConcurrentHashMap<Integer, String> a = new ConcurrentHashMap<>(1 << 24);
+            Pair[] a = new Pair[1 << 24];
+            avg = new ConcurrentHashMap<>(1_000_000);
+
             Files.lines(baseDataDirectory.resolve("customer.tbl"))
                     .unordered()
                     .parallel()
@@ -52,7 +67,7 @@ public class Database {
                                 if (j == 1) {
                                     key = parseInt(x, o, i);
                                 } else if (j == 6) {
-                                    a.put(key, x.substring(o, i));
+                                    a[key] = avg.computeIfAbsent(x.substring(o, i), y -> new Pair());
                                     break;
                                 }
                                 o = i + 1;
@@ -115,7 +130,7 @@ public class Database {
             // System.out.println(b.size());
             try {
 
-                ConcurrentHashMap<Integer, String> a = new ConcurrentHashMap<>(1 << 24);
+                Pair[] a = new Pair[1 << 24];
                 Files.lines(baseDataDirectory.resolve("orders.tbl"))
                         .unordered()
                         .parallel()
@@ -129,7 +144,8 @@ public class Database {
                                     if (j == 0) {
                                         key = parseInt(x, o, i);
                                     } else if (j == 1) {
-                                        a.put(key, sPC.get(parseInt(x, o, i)));
+                                        //a.put(key, );
+                                        a[key] = sPC[parseInt(x, o, i)];
                                         break;
                                     }
                                     o = i + 1;
@@ -143,26 +159,22 @@ public class Database {
                         });
 
 
-                countPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
-                quantPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
                 Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
                         .unordered()
                         .parallel()
                         .forEach(x -> {
                             //custom split
-                            String key = null;
+                            Pair key = null;
                             int j = 0;
                             int o = 0;
                             for (int i = 0, n = x.length(); i < n; i++) {
 
                                 if (x.charAt(i) == '|') {
                                     if (j == 0) {
-                                        key = a.get(parseInt(x, o, i));
+                                        key = a[parseInt(x, o, i)];
                                     } else if (j == 4) {
-                                        quantPerMarketSegment.computeIfAbsent(key, y -> new LongAdder()).add(
-                                                parseInt(x, o, i)
-                                        );
-                                        countPerMarketSegment.computeIfAbsent(key, y -> new LongAdder()).increment();
+                                        key.fst.add(parseInt(x, o, i));
+                                        key.snd.increment();
                                         break;
                                     }
                                     o = i + 1;
@@ -182,7 +194,6 @@ public class Database {
             cache = true;
         }
         //System.out.println(averageQuantityPerMarketSegment.size());
-        return (100 * quantPerMarketSegment.get(marketsegment).longValue()) /
-                countPerMarketSegment.get(marketsegment).longValue();
-    }
+        return avg.get(marketsegment).ans();
+}
 }
