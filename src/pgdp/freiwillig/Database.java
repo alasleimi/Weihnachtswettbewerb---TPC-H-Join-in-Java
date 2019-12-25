@@ -30,30 +30,13 @@ public class Database {
     }
 
 
-    public static Stream<Customer> processInputFileCustomer() {
-        try {
-            return Files.lines(baseDataDirectory.resolve("customer.tbl"))
-                    .parallel()
-                    .map(x -> {
-                        String[] d = x.split("\\|");
-
-
-                        return new Customer(Integer.parseInt(d[1].replaceAll("\\D", ""))
-                                , d[6]
-                        );
-                    });
-        } catch (Exception e) {
-
-            throw new RuntimeException("file not found");
-        }
-        // TODO
-    }
 
 
     public static Map<String, Integer> custPerOrder() {
         try {
-            return Files.lines(baseDataDirectory.resolve("orders.tbl")).
-                    parallel()
+            return Files.lines(baseDataDirectory.resolve("orders.tbl"))
+                    .unordered()
+                    .parallel()
                     .map(x -> x.split("\\|"))
                     .collect(Collectors.toConcurrentMap(x -> x[0], x -> Integer.parseInt(x[1])));
 
@@ -67,8 +50,9 @@ public class Database {
 
     public static Map<Integer, String> segPerCust() {
         try {
-            return Files.lines(baseDataDirectory.resolve("customer.tbl")).
-                    parallel()
+            return Files.lines(baseDataDirectory.resolve("customer.tbl"))
+                    .unordered()
+                    .parallel()
                     .map(x -> x.split("\\|"))
                     .collect(Collectors.toConcurrentMap(x -> Integer.parseInt(x[1]
                             .replaceAll("\\D", "")), x -> x[6]));
@@ -96,6 +80,7 @@ public class Database {
             var b = segPerCust();
             try {
                 averageQuantityPerMarketSegment = Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
+                        .unordered()
                         .parallel()
                         .map(x -> x.split("\\|")).collect(Collectors.groupingByConcurrent(x -> b.get(a.get(x[0])),
                                 Collectors.teeing(
