@@ -36,22 +36,23 @@ public class Database {
 
     }
 
-    public static Map<Integer, String> segPerCust() {
+    public static ConcurrentHashMap<Integer, String> segPerCust() {
         try {
-            return Files.lines(baseDataDirectory.resolve("customer.tbl"))
+            ConcurrentHashMap<Integer, String> a = new ConcurrentHashMap<>(1 << 24);
+            Files.lines(baseDataDirectory.resolve("customer.tbl"))
                     .unordered()
                     .parallel()
-                    .map(x -> {
-                        String[] answer = new String[2];
+                    .forEach(x -> {
+                        int key = 0;
                         int j = 0;
                         int o = 0;
                         for (int i = 0; i < x.length(); i++) {
 
                             if (x.charAt(i) == '|') {
                                 if (j == 1) {
-                                    answer[0] = x.substring(o, i);
+                                    key = parseInt(x, o, i);
                                 } else if (j == 6) {
-                                    answer[1] = x.substring(o, i);
+                                    a.put(key, x.substring(o, i));
                                     break;
                                 }
                                 o = i + 1;
@@ -61,12 +62,13 @@ public class Database {
 
 
                         }
-                        //System.out.println(answer[0] + " " + answer[1]);
-                        return answer;
-                    })
-                    .collect(Collectors.toConcurrentMap(x -> parseInt(x[0], 0, x[0].length()),
-                            x -> x[1], (x, v) -> v,
-                            () -> new ConcurrentHashMap<Integer, String>(1 << 24)));
+
+                    });
+            /**.collect(Collectors.toConcurrentMap(x -> parseInt(x[0], 0, x[0].length()),
+             x -> x[1], (x, v) -> v,
+             () -> new ConcurrentHashMap<Integer, String>(1 << 24)));**/
+
+            return a;
 
 
         } catch (IOException e) {
@@ -172,28 +174,12 @@ public class Database {
                             }
                             //System.out.println(answer[0] + " " + answer[1]);
                             return answer;
-                        })/**.collect(Collectors.groupingBy(x -> a.get(x[0]),
-                 () -> new HashMap<>(1_000_000),
-                 Collector.of(() -> new long[2],
-                 (u, t) -> {
-                 u[0] += t[1];
-                 ++u[1];
-                 },
-                 (u, b) -> {
-                 u[0] += b[0];
-                 u[1] += b[1];
-                 return u;
-                 },
-                 u -> (100 * u[0]) / u[1])
+                        }).forEach(x -> {
+                    var tmp = a.get(x[0]);
+                    quantPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).add(x[1]);
+                    countPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).increment();
 
-                 )
-                 );**/
-                        .forEach(x -> {
-                            var tmp = a.get(x[0]);
-                            quantPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).add(x[1]);
-                            countPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).increment();
-
-                        });
+                });
             } catch (IOException e) {
                 throw new RuntimeException("no file");
             }
