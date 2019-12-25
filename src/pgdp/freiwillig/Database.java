@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -20,6 +21,8 @@ public class Database {
     // TODO have fun :)
 
     static private Map<String, Long> averageQuantityPerMarketSegment;
+    static private ConcurrentHashMap<String, LongAdder> quantPerMarketSegment;
+    static private ConcurrentHashMap<String, LongAdder> countPerMarketSegment;
     private static boolean cache = false;
 
     private static Path baseDataDirectory = Paths.get("C:\\Users\\ACER\\Downloads\\data");
@@ -141,8 +144,9 @@ public class Database {
                         .collect(Collectors.toConcurrentMap(x -> x[0], x -> sPC.get(x[1]), (x, v) -> v,
                                 () -> new ConcurrentHashMap<Integer, String>(1 << 24)));
 
-
-                averageQuantityPerMarketSegment = Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
+                countPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
+                quantPerMarketSegment = new ConcurrentHashMap<>(1_000_000);
+                Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
                         .unordered()
                         .parallel()
                         .map(x -> {
@@ -168,22 +172,28 @@ public class Database {
                             }
                             //System.out.println(answer[0] + " " + answer[1]);
                             return answer;
-                        }).collect(Collectors.groupingBy(x -> a.get(x[0]),
-                                () -> new HashMap<>(1_000_000),
-                                Collector.of(() -> new long[2],
-                                        (u, t) -> {
-                                            u[0] += t[1];
-                                            ++u[1];
-                                        },
-                                        (u, b) -> {
-                                            u[0] += b[0];
-                                            u[1] += b[1];
-                                            return u;
-                                        },
-                                        u -> (100 * u[0]) / u[1])
+                        })/**.collect(Collectors.groupingBy(x -> a.get(x[0]),
+                 () -> new HashMap<>(1_000_000),
+                 Collector.of(() -> new long[2],
+                 (u, t) -> {
+                 u[0] += t[1];
+                 ++u[1];
+                 },
+                 (u, b) -> {
+                 u[0] += b[0];
+                 u[1] += b[1];
+                 return u;
+                 },
+                 u -> (100 * u[0]) / u[1])
 
-                                )
-                        );
+                 )
+                 );**/
+                        .forEach(x -> {
+                            var tmp = a.get(x[0]);
+                            quantPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).add(x[1]);
+                            countPerMarketSegment.computeIfAbsent(tmp, y -> new LongAdder()).increment();
+
+                        });
             } catch (IOException e) {
                 throw new RuntimeException("no file");
             }
@@ -191,6 +201,7 @@ public class Database {
             cache = true;
         }
         //System.out.println(averageQuantityPerMarketSegment.size());
-        return averageQuantityPerMarketSegment.get(marketsegment);
+        return (100 * quantPerMarketSegment.get(marketsegment).longValue()) /
+                countPerMarketSegment.get(marketsegment).longValue();
     }
 }
