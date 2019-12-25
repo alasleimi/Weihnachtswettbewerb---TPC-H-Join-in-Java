@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -49,10 +50,11 @@ public class Database {
 
     }
 
-    public static Pair[] segPerCust() {
+    public static ConcurrentHashMap<Integer, Pair> segPerCust() {
         try {
-            Pair[] a = new Pair[1 << 24];
-            avg = new ConcurrentHashMap<>(1_000_000);
+            ConcurrentHashMap<Integer, Pair> a = new ConcurrentHashMap<>();
+            //avg = new ConcurrentHashMap<>(1_000_000);
+            avg = new ConcurrentSkipListMap<>();
 
             Files.lines(baseDataDirectory.resolve("customer.tbl"))
                     .unordered()
@@ -67,7 +69,7 @@ public class Database {
                                 if (j == 1) {
                                     key = parseInt(x, o, i);
                                 } else if (j == 6) {
-                                    a[key] = avg.computeIfAbsent(x.substring(o, i), y -> new Pair());
+                                    a.put(key, avg.computeIfAbsent(x.substring(o, i), y -> new Pair()));
                                     break;
                                 }
                                 o = i + 1;
@@ -130,7 +132,7 @@ public class Database {
             // System.out.println(b.size());
             try {
 
-                Pair[] a = new Pair[1 << 24];
+                ConcurrentHashMap<Integer, Pair> a = new ConcurrentHashMap<>();
                 Files.lines(baseDataDirectory.resolve("orders.tbl"))
                         .unordered()
                         .parallel()
@@ -138,14 +140,14 @@ public class Database {
                             int key = 0;
                             int j = 0;
                             int o = 0;
-                            for (int i = 0, n = x.length(); i < n; i++) {
+                            for (int i = 0; ; i++) {
 
                                 if (x.charAt(i) == '|') {
                                     if (j == 0) {
                                         key = parseInt(x, o, i);
                                     } else if (j == 1) {
-                                        //a.put(key, );
-                                        a[key] = sPC[parseInt(x, o, i)];
+                                        a.put(key, sPC.get(parseInt(x, o, i)));
+
                                         break;
                                     }
                                     o = i + 1;
@@ -167,11 +169,11 @@ public class Database {
                             Pair key = null;
                             int j = 0;
                             int o = 0;
-                            for (int i = 0, n = x.length(); i < n; i++) {
+                            for (int i = 0; ; i++) {
 
                                 if (x.charAt(i) == '|') {
                                     if (j == 0) {
-                                        key = a[parseInt(x, o, i)];
+                                        key = a.get(parseInt(x, o, i));
                                     } else if (j == 4) {
                                         key.fst.add(parseInt(x, o, i));
                                         key.snd.increment();
