@@ -141,7 +141,7 @@ public class Database {
 
 
         BiFunction<Integer, Integer, Callable<Object>> f = (Integer s, Integer e) -> () -> {
-            int col = 0;
+            int col = 0x0;
             int colStart = s;
             Pair key = null;
             for (int i = s; i < e; i++) {
