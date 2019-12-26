@@ -3,7 +3,10 @@ package pgdp.freiwillig;
 // TODO Imports
 
 import javax.imageio.IIOException;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -89,37 +92,7 @@ public class Database {
 
 
             }
-            /**
-             System.out.println(line);
 
-             Files.lines(baseDataDirectory.resolve("customer.tbl"))
-             .unordered()
-             .parallel()
-             .forEach(x -> {
-             int key = 0;
-             int j = 0;
-             int o = 0;
-             for (int i = 0; ; i++) {
-
-                            if (x.charAt(i) == '|') {
-                                if (j == 1) {
-                                    key = parseInt(x, o, i);
-                                } else if (j == 6) {
-                                    a.put(key, avg.computeIfAbsent(x.substring(o, i), y -> new Pair()));
-                                    break;
-                                }
-                                o = i + 1;
-                                ++j;
-
-                            }
-
-
-                        }
-
-                    });
-            /**.collect(Collectors.toConcurrentMap(x -> parseInt(x[0], 0, x[0].length()),
-             x -> x[1], (x, v) -> v,
-             () -> new ConcurrentHashMap<Integer, String>(1 << 24)));**/
 
             return a;
 
@@ -159,8 +132,8 @@ public class Database {
         return q;
     }
 
-    static int parseInt(byte[] s, int start, int end) {
-        int i = start;
+    static int parseInt(byte[] s, int i, int end) {
+
         int q = 0;
 
         for (byte c = s[i]; c > '9' || c < '1'; c = s[++i]) ;
@@ -215,9 +188,16 @@ public class Database {
                 }
 
                 //var start = System.nanoTime();
-                b = Files.readAllBytes(baseDataDirectory.resolve("lineitem.tbl"));
+
+                var fin = new FileInputStream(baseDataDirectory.resolve("lineitem.tbl").toFile());
+                var ch = fin.getChannel();
+                int size = (int) ch.size();
+                MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
+                b = new byte[size];
+                buf.get(b);
+                //b = Files.readAllBytes();
                 //var end = System.nanoTime();
-                //System.out.println((end - start)/1_000_000);
+                // System.out.println((end - start)/1_000_000);
                 //start = System.nanoTime();
                 int j2 = 0;
                 int o2 = 0;
