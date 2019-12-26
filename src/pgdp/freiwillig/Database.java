@@ -58,7 +58,17 @@ public class Database {
             Pair[] a = new Pair[1 << 24];
             //avg = new ConcurrentHashMap<>(1_000_000);
             avg = new HashMap<String, Pair>();
-            byte[] b = Files.readAllBytes(baseDataDirectory.resolve("customer.tbl"));
+
+            //var s = System.nanoTime();
+            //byte[] b = Files.readAllBytes(baseDataDirectory.resolve("customer.tbl"));
+            var fin = new FileInputStream(baseDataDirectory.resolve("customer.tbl").toFile());
+            var ch = fin.getChannel();
+            int size = (int) ch.size();
+            MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
+            byte[] b = new byte[size];
+            buf.get(b);
+            //var e = System.nanoTime();
+            //System.out.println((e - s)/1_000_000);
 
             int j1 = 0;
             int o1 = 0;
@@ -155,8 +165,17 @@ public class Database {
 
                 Pair[] a = new Pair[1 << 24];
 
+                // var e1 = System.nanoTime();
+                var fin2 = new FileInputStream(baseDataDirectory.resolve("orders.tbl").toFile());
+                var ch2 = fin2.getChannel();
+                int size2 = (int) ch2.size();
+                MappedByteBuffer buf = ch2.map(FileChannel.MapMode.READ_ONLY, 0, size2);
+                byte[] b = new byte[size2];
+                buf.get(b);
+                //byte[] b = Files.readAllBytes(baseDataDirectory.resolve("orders.tbl"));
+                //var e2 = System.nanoTime();
+                //System.out.println((e2 - e1)/1_000_000);
 
-                byte[] b = Files.readAllBytes(baseDataDirectory.resolve("orders.tbl"));
 
                 int j1 = 0;
                 int o1 = 0;
@@ -192,9 +211,9 @@ public class Database {
                 var fin = new FileInputStream(baseDataDirectory.resolve("lineitem.tbl").toFile());
                 var ch = fin.getChannel();
                 int size = (int) ch.size();
-                MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
+                MappedByteBuffer bufs = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
                 b = new byte[size];
-                buf.get(b);
+                bufs.get(b);
                 //b = Files.readAllBytes();
                 //var end = System.nanoTime();
                 // System.out.println((end - start)/1_000_000);
