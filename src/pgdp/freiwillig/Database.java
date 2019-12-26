@@ -12,9 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -23,7 +21,7 @@ import java.util.stream.Stream;
 public class Database {
     // TODO have fun :)
 
-
+    private static ExecutorService executor = Executors.newFixedThreadPool(3);
     private static HashMap<String, Pair> avg;
 
     static class Pair {
@@ -53,64 +51,54 @@ public class Database {
     }
 
 
-    public static PairArr segPerCust() {
-        try {
-            PairArr a = new PairArr(150_005);
-            //avg = new ConcurrentHashMap<>(1_000_000);
-            avg = new HashMap<String, Pair>();
+    public static PairArr segPerCust(byte[] b) {
 
-            //var s = System.nanoTime();
-            //byte[] b = Files.readAllBytes(baseDataDirectory.resolve("customer.tbl"));
-            var fin = new FileInputStream(baseDataDirectory.resolve("customer.tbl").toFile());
-            var ch = fin.getChannel();
-            int size = (int) ch.size();
-            MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
-            byte[] b = new byte[size];
-            buf.get(b);
-            //var e = System.nanoTime();
-            //System.out.println((e - s)/1_000_000);
+        //System.out.println("start cust p");
+        PairArr a = new PairArr(150_005);
 
-            int j1 = 0;
-            int o1 = 0;
+        //avg = new ConcurrentHashMap<>(1_000_000);
+        avg = new HashMap<String, Pair>();
 
-            int key = 0;
-            //System.out.println(new String(Arrays.copyOfRange(b,0,b.length)));
-            for (int i = 0; i < b.length; i++) {
+        //var e = System.nanoTime();
+        //System.out.println((e - s)/1_000_000);
 
-                //System.out.print(ch);
+        int j1 = 0;
+        int o1 = 0;
 
-                if (b[i] == '|') {
+        int key = 0;
+        //System.out.println(new String(Arrays.copyOfRange(b,0,b.length)));
+        for (int i = 0; i < b.length; i++) {
 
-                    if (j1 == 1) {
-                        key = parseInt(b, o1, i);
+            //System.out.print(ch);
 
-                    } else if (j1 == 6) {
+            if (b[i] == '|') {
+
+                if (j1 == 1) {
+                    key = parseInt(b, o1, i);
+
+                } else if (j1 == 6) {
 
 
-                        //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
-                        a.put(key, avg.computeIfAbsent(new String(Arrays.copyOfRange(b, o1, i)), y -> new Pair()));
-                        while (b[i] != '\n') ++i;
-                        j1 = 0;
-                        o1 = i + 1;
-                        continue;
-                    }
-                    ++j1;
+                    //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
+                    a.put(key, avg.computeIfAbsent(new String(Arrays.copyOfRange(b, o1, i)), y -> new Pair()));
+                    while (b[i] != '\n') ++i;
+                    j1 = 0;
                     o1 = i + 1;
-
-
+                    continue;
                 }
+                ++j1;
+                o1 = i + 1;
 
 
             }
 
 
-            return a;
-
-
-        } catch (IOException e) {
-
-            throw new RuntimeException("file not found");
         }
+
+
+        return a;
+
+
         // TODO
     }
 
@@ -197,19 +185,66 @@ public class Database {
         if (!cache) {
             //var a = custPerOrder();
             //System.out.println(a.size());
-            var sPC = segPerCust();
+
+            var cust = executor.submit(() -> {
+                        //System.out.println("read cust");
+                        var fin = new FileInputStream(baseDataDirectory.resolve("customer.tbl").toFile());
+                        var ch = fin.getChannel();
+                        int size = (int) ch.size();
+                        MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
+                        byte[] x = new byte[size];
+                        buf.get(x);
+                        // System.out.println("cust done");
+
+                        return x;
+                    }
+            );
+
+            var order = executor.submit(() -> {
+                        //System.out.println("read order");
+                        var fin = new FileInputStream(baseDataDirectory.resolve("orders.tbl").toFile());
+                        var ch = fin.getChannel();
+                        int size = (int) ch.size();
+                        MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
+                        byte[] x = new byte[size];
+                        buf.get(x);
+                        //System.out.println("order done");
+                        return x;
+                    }
+            );
+
+            var lineItem = executor.submit(() -> {
+                        // System.out.println("read item");
+                        var fin = new FileInputStream(baseDataDirectory.resolve("lineitem.tbl").toFile());
+                        var ch = fin.getChannel();
+                        int size = (int) ch.size();
+                        MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
+                        byte[] x = new byte[size];
+                        buf.get(x);
+                        // System.out.println("item done");
+                        return x;
+                    }
+            );
+            //var s = System.nanoTime();
+            //byte[] b = Files.readAllBytes(baseDataDirectory.resolve("customer.tbl"));
+
+            PairArr sPC = null;
+            try {
+
+                sPC = segPerCust(cust.get());
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
             // System.out.println(b.size());
             try {
 
                 //Pair[] a = new Pair[1 << 24];
                 PairArr a = new PairArr(6_000_005);
                 // var e1 = System.nanoTime();
-                var fin2 = new FileInputStream(baseDataDirectory.resolve("orders.tbl").toFile());
-                var ch2 = fin2.getChannel();
-                int size2 = (int) ch2.size();
-                MappedByteBuffer buf = ch2.map(FileChannel.MapMode.READ_ONLY, 0, size2);
-                byte[] b = new byte[size2];
-                buf.get(b);
+                byte[] b = order.get();
+                //System.out.println("start order p");
                 //byte[] b = Files.readAllBytes(baseDataDirectory.resolve("orders.tbl"));
                 //var e2 = System.nanoTime();
                 //System.out.println((e2 - e1)/1_000_000);
@@ -246,12 +281,8 @@ public class Database {
 
                 //var start = System.nanoTime();
 
-                var fin = new FileInputStream(baseDataDirectory.resolve("lineitem.tbl").toFile());
-                var ch = fin.getChannel();
-                int size = (int) ch.size();
-                MappedByteBuffer bufs = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
-                b = new byte[size];
-                bufs.get(b);
+                b = lineItem.get();
+                //System.out.println("start item p");
                 //b = Files.readAllBytes();
                 //var end = System.nanoTime();
                 // System.out.println((end - start)/1_000_000);
@@ -289,8 +320,10 @@ public class Database {
                 }
                 //end = System.nanoTime();
                 //System.out.println((end - start)/1_000_000);
-            } catch (IOException e) {
-                throw new RuntimeException("no file");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
             }
 
             cache = true;
