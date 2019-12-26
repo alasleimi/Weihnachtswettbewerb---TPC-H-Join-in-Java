@@ -9,10 +9,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 
 public class Database {
     // TODO have fun :)
@@ -129,29 +133,48 @@ public class Database {
 
     void calculatePerSegment(PairArr orderToSegment, byte[] lineitem) {
 
-        int col = 0;
-        int colStart = 0;
-        Pair key = null;
 
-        for (int i = 0; i < lineitem.length; i++) {
+        int ft = lineitem.length / 3;
+        for (; ft < lineitem.length && lineitem[ft] != '\n'; ++ft) ;
+        int tt = (lineitem.length - ft) / 2;
+        for (; tt < lineitem.length && lineitem[tt] != '\n'; ++tt) ;
 
-            if (lineitem[i] == '|') {
 
-                if (col == 0) {
-                    key = orderToSegment.get(parseInt(lineitem, colStart, i));
-                } else if (col == 4) {
-                    key.fst += parseInt(lineitem, colStart, i);
-                    ++key.snd;
-                    while (lineitem[i] != '\n') ++i;
-                    col = 0;
+        BiFunction<Integer, Integer, Callable<Object>> f = (Integer s, Integer e) -> () -> {
+            int col = 0;
+            int colStart = s;
+            Pair key = null;
+            for (int i = s; i < e; i++) {
+
+                if (lineitem[i] == '|') {
+
+                    if (col == 0) {
+                        key = orderToSegment.get(parseInt(lineitem, colStart, i));
+                    } else if (col == 4) {
+                        key.fst.add(parseInt(lineitem, colStart, i));
+                        key.snd.increment();
+                        while (lineitem[i] != '\n') ++i;
+                        col = 0;
+                        colStart = i + 1;
+                        continue;
+                    }
+                    ++col;
                     colStart = i + 1;
-                    continue;
-                }
-                ++col;
-                colStart = i + 1;
 
+                }
             }
+            return null;
+        };
+
+
+        try {
+            executor.invokeAll(List.of(f.apply(0, ft),
+                    f.apply(ft, tt),
+                    f.apply(tt, lineitem.length)));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
+
     }
 
     Callable<byte[]> readTable(String tableName) {
@@ -191,10 +214,10 @@ public class Database {
     }
 
     static class Pair {
-        long fst, snd;
+        LongAdder fst = new LongAdder(), snd = new LongAdder();
 
         long ans() {
-            return (100 * fst) / snd;
+            return (100 * fst.longValue()) / snd.longValue();
         }
     }
 
@@ -205,7 +228,6 @@ public class Database {
         // 2 < initSize < INTEGER.MAX_VALUE  - 2
         // because we can't have an array of size > Max_VALUE - 2;
         // this class is  made to handle the cases where a key is > Max_VALUE - 3
-
         PairArr(int initSz) {
             fst = new Pair[initSz];
         }
