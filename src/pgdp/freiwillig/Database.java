@@ -2,112 +2,75 @@ package pgdp.freiwillig;
 
 // TODO Imports
 
-import javax.imageio.IIOException;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDate;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.LongAdder;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Database {
     // TODO have fun :)
 
-    private static ExecutorService executor = Executors.newFixedThreadPool(3);
-    private static HashMap<String, Pair> avg;
-
-    static class Pair {
-        long fst, snd;
-
-        Pair() {
-            fst = 0;
-            snd = 0;
-        }
-
-        long ans() {
-            return (100 * fst) / snd;
-        }
-    }
-
+    private static final ExecutorService executor = Executors.newFixedThreadPool(3);
+    private static HashMap<String, Pair> avgSegment;
     private static boolean cache = false;
-
     private static Path baseDataDirectory = Paths.get("C:\\Users\\ACER\\Downloads\\data");
-
-
-    public static void setBaseDataDirectory(Path _baseDataDirectory) {
-
-        Database.baseDataDirectory = _baseDataDirectory;
-        cache = false;
-
-
-    }
-
-
-    public static PairArr segPerCust(byte[] b) {
-
-        //System.out.println("start cust p");
-        PairArr a = new PairArr(150_005);
-
-        //avg = new ConcurrentHashMap<>(1_000_000);
-        avg = new HashMap<String, Pair>();
-
-        //var e = System.nanoTime();
-        //System.out.println((e - s)/1_000_000);
-
-        int j1 = 0;
-        int o1 = 0;
-
-        int key = 0;
-        //System.out.println(new String(Arrays.copyOfRange(b,0,b.length)));
-        for (int i = 0; i < b.length; i++) {
-
-            //System.out.print(ch);
-
-            if (b[i] == '|') {
-
-                if (j1 == 1) {
-                    key = parseInt(b, o1, i);
-
-                } else if (j1 == 6) {
-
-
-                    //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
-                    a.put(key, avg.computeIfAbsent(new String(Arrays.copyOfRange(b, o1, i)), y -> new Pair()));
-                    while (b[i] != '\n') ++i;
-                    j1 = 0;
-                    o1 = i + 1;
-                    continue;
-                }
-                ++j1;
-                o1 = i + 1;
-
-
-            }
-
-
-        }
-
-
-        return a;
-
-
-        // TODO
-    }
-
 
     public Database() {
     }
 
+    public static void setBaseDataDirectory(Path _baseDataDirectory) {
+        Database.baseDataDirectory = _baseDataDirectory;
+        cache = false;
+    }
+
+
+    public static PairArr getCustomerToSegment(byte[] customer) {
+
+        PairArr customerToSegment = new PairArr(150_005);
+        avgSegment = new HashMap<>();
+
+        int col = 0;
+        int colStart = 0;
+
+        int key = 0;
+
+        for (int i = 0; i < customer.length; i++) {
+
+            if (customer[i] == '|') {
+
+                if (col == 1) {
+
+                    key = parseInt(customer, colStart, i);
+                } else if (col == 6) {
+                    customerToSegment
+                            .put(key,
+                                    avgSegment.computeIfAbsent(
+                                            new String(Arrays.copyOfRange(customer, colStart, i)),
+                                            y -> new Pair()));
+
+                    while (customer[i] != '\n') ++i;
+                    col = 0;
+                    colStart = i + 1;
+                    continue;
+                }
+                ++col;
+                colStart = i + 1;
+
+            }
+
+        }
+
+        return customerToSegment;
+    }
+
     public static void main(String[] args) {
-        //processInputFileOrders().forEach(System.out::println);
         var s = System.nanoTime();
         var db = new Database();
         System.out.println(db.getAverageQuantityPerMarketSegment("AUTOMOBILE"));
@@ -118,17 +81,6 @@ public class Database {
         System.out.println((e - s) / 1_000_000);
     }
 
-    static int parseInt(String s, int start, int end) {
-        int i = start;
-        int q = 0;
-
-        for (char c = s.charAt(i); c > '9' || c < '1'; c = s.charAt(++i)) ;
-        for (; i < end; ++i) {
-            q *= 10;
-            q += s.charAt(i) - '0'; // - 0
-        }
-        return q;
-    }
 
     static int parseInt(byte[] s, int i, int end) {
 
@@ -142,18 +94,121 @@ public class Database {
         return q;
     }
 
-    static class PairArr {
-        Pair[] fst;
-        Pair[] snd;
+    PairArr getOrderToSegment(PairArr customerToSegment, byte[] orders) {
+        PairArr orderToSegment = new PairArr(6_000_005);
 
+        int col = 0;
+        int colStart = 0;
+
+        int key = 0;
+
+        for (int i = 0; i < orders.length; i++) {
+
+            if (orders[i] == '|') {
+
+                if (col == 0) {
+                    key = parseInt(orders, colStart, i);
+                } else if (col == 1) {
+
+                    orderToSegment.put(key, customerToSegment.get(parseInt(orders, colStart, i)));
+                    while (orders[i] != '\n') ++i;
+                    col = 0;
+                    colStart = i + 1;
+                    continue;
+                }
+                ++col;
+                colStart = i + 1;
+
+            }
+        }
+
+        return orderToSegment;
+
+
+    }
+
+    void calculatePerSegment(PairArr orderToSegment, byte[] lineitem) {
+
+        int col = 0;
+        int colStart = 0;
+        Pair key = null;
+
+        for (int i = 0; i < lineitem.length; i++) {
+
+            if (lineitem[i] == '|') {
+
+                if (col == 0) {
+                    key = orderToSegment.get(parseInt(lineitem, colStart, i));
+                } else if (col == 4) {
+                    key.fst += parseInt(lineitem, colStart, i);
+                    ++key.snd;
+                    while (lineitem[i] != '\n') ++i;
+                    col = 0;
+                    colStart = i + 1;
+                    continue;
+                }
+                ++col;
+                colStart = i + 1;
+
+            }
+        }
+    }
+
+    Callable<byte[]> readTable(String tableName) {
+
+        return () -> {
+
+            var ch = new FileInputStream(baseDataDirectory.resolve(tableName).toFile()).getChannel();
+            int size = (int) ch.size();
+            MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
+            byte[] table = new byte[size];
+            buf.get(table);
+            return table;
+
+        };
+    }
+
+    public long getAverageQuantityPerMarketSegment(String marketsegment) {
+        if (!cache) {
+
+            var customer = executor.submit(readTable("customer.tbl"));
+            var orders = executor.submit(readTable("orders.tbl"));
+            var lineitem = executor.submit(readTable("lineitem.tbl"));
+
+            try {
+                PairArr customerToSegement = getCustomerToSegment(customer.get());
+                PairArr orderToSegment = getOrderToSegment(customerToSegement, orders.get());
+                calculatePerSegment(orderToSegment, lineitem.get());
+
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+
+            cache = true;
+        }
+
+        return avgSegment.get(marketsegment).ans();
+    }
+
+    static class Pair {
+        long fst, snd;
+
+        long ans() {
+            return (100 * fst) / snd;
+        }
+    }
+
+    static class PairArr {
+        final Pair[] fst;
+        Pair[] snd;
 
         // 2 < initSize < INTEGER.MAX_VALUE  - 2
         // because we can't have an array of size > Max_VALUE - 2;
-        // this class is only made to handle the case where a key is > Max_VALUE - 1
+        // this class is  made to handle the cases where a key is > Max_VALUE - 3
+
         PairArr(int initSz) {
             fst = new Pair[initSz];
         }
-
 
         void put(int key, Pair value) {
             if (key < fst.length) {
@@ -161,7 +216,7 @@ public class Database {
             } else {
                 key -= fst.length;
                 if (snd == null) {
-                    System.out.println("allocate second");
+                    //System.out.println("allocate second");
                     snd = new Pair[Integer.MAX_VALUE - fst.length];
                 }
                 snd[key] = value;
@@ -169,166 +224,8 @@ public class Database {
         }
 
         Pair get(int key) {
-            if (key < fst.length) {
-                return fst[key];
-            }
-            return snd[key - fst.length];
-
-
+            return key < fst.length ? fst[key] : snd[key - fst.length];
         }
-
 
     }
-
-
-    public long getAverageQuantityPerMarketSegment(String marketsegment) {
-        if (!cache) {
-            //var a = custPerOrder();
-            //System.out.println(a.size());
-
-            var cust = executor.submit(() -> {
-                        //System.out.println("read cust");
-                        var fin = new FileInputStream(baseDataDirectory.resolve("customer.tbl").toFile());
-                        var ch = fin.getChannel();
-                        int size = (int) ch.size();
-                        MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
-                        byte[] x = new byte[size];
-                        buf.get(x);
-                        // System.out.println("cust done");
-
-                        return x;
-                    }
-            );
-
-            var order = executor.submit(() -> {
-                        //System.out.println("read order");
-                        var fin = new FileInputStream(baseDataDirectory.resolve("orders.tbl").toFile());
-                        var ch = fin.getChannel();
-                        int size = (int) ch.size();
-                        MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
-                        byte[] x = new byte[size];
-                        buf.get(x);
-                        //System.out.println("order done");
-                        return x;
-                    }
-            );
-
-            var lineItem = executor.submit(() -> {
-                        // System.out.println("read item");
-                        var fin = new FileInputStream(baseDataDirectory.resolve("lineitem.tbl").toFile());
-                        var ch = fin.getChannel();
-                        int size = (int) ch.size();
-                        MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
-                        byte[] x = new byte[size];
-                        buf.get(x);
-                        // System.out.println("item done");
-                        return x;
-                    }
-            );
-            //var s = System.nanoTime();
-            //byte[] b = Files.readAllBytes(baseDataDirectory.resolve("customer.tbl"));
-
-            PairArr sPC = null;
-            try {
-
-                sPC = segPerCust(cust.get());
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            }
-            // System.out.println(b.size());
-            try {
-
-                //Pair[] a = new Pair[1 << 24];
-                PairArr a = new PairArr(6_000_005);
-                // var e1 = System.nanoTime();
-                byte[] b = order.get();
-                //System.out.println("start order p");
-                //byte[] b = Files.readAllBytes(baseDataDirectory.resolve("orders.tbl"));
-                //var e2 = System.nanoTime();
-                //System.out.println((e2 - e1)/1_000_000);
-
-
-                int j1 = 0;
-                int o1 = 0;
-
-                int key1 = 0;
-                //System.out.println(new String(Arrays.copyOfRange(b,0,b.length)));
-                for (int i = 0; i < b.length; i++) {
-
-                    //System.out.print(ch);
-
-                    if (b[i] == '|') {
-
-                        if (j1 == 0) {
-                            key1 = parseInt(b, o1, i);
-                            //System.out.println(key1);
-
-                        } else if (j1 == 1) {
-                            //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
-                            a.put(key1, sPC.get(parseInt(b, o1, i)));
-                            while (b[i] != '\n') ++i;
-                            j1 = 0;
-                            o1 = i + 1;
-                            continue;
-                        }
-                        ++j1;
-                        o1 = i + 1;
-
-                    }
-                }
-
-                //var start = System.nanoTime();
-
-                b = lineItem.get();
-                //System.out.println("start item p");
-                //b = Files.readAllBytes();
-                //var end = System.nanoTime();
-                // System.out.println((end - start)/1_000_000);
-                //start = System.nanoTime();
-                int j2 = 0;
-                int o2 = 0;
-
-                Pair key2 = null;
-                //System.out.println(new String(Arrays.copyOfRange(b,0,b.length)));
-                for (int i = 0; i < b.length; i++) {
-                    //char ch = (char) b[i];
-                    //System.out.print(ch);
-
-                    if (b[i] == '|') {
-
-                        if (j2 == 0) {
-                            key2 = a.get(parseInt(b, o2, i));
-                            //System.out.println(key2);
-
-                        } else if (j2 == 4) {
-                            //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
-
-                            //System.out.println(tmp);
-                            key2.fst += parseInt(b, o2, i);
-                            ++key2.snd;
-                            while (b[i] != '\n') ++i;
-                            j2 = 0;
-                            o2 = i + 1;
-                            continue;
-                        }
-                        ++j2;
-                        o2 = i + 1;
-
-                    }
-                }
-                //end = System.nanoTime();
-                //System.out.println((end - start)/1_000_000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            }
-
-            cache = true;
-        }
-        //System.out.println(averageQuantityPerMarketSegment.size());
-        return avg.get(marketsegment).ans();
-}
 }
