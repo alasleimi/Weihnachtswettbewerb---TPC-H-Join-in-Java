@@ -14,9 +14,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 
 public class Database {
     // TODO have fun :)
@@ -131,16 +129,8 @@ public class Database {
 
     }
 
-    void calculatePerSegment(PairArr orderToSegment, byte[] lineitem) {
-
-
-        int ft = lineitem.length / 3;
-        for (; ft < lineitem.length && lineitem[ft] != '\n'; ++ft) ;
-        int tt = ft + (lineitem.length - ft) / 2;
-        for (; tt < lineitem.length && lineitem[tt] != '\n'; ++tt) ;
-
-
-        BiFunction<Integer, Integer, Callable<Object>> f = (Integer s, Integer e) -> () -> {
+    Callable<Object> generateCalculateTask(byte[] lineitem, PairArr orderToSegment, int s, int e, BiConsumer<Pair, Integer> upd) {
+        return () -> {
             int col = 0x0;
             int colStart = s;
             Pair key = null;
@@ -151,8 +141,7 @@ public class Database {
                     if (col == 0) {
                         key = orderToSegment.get(parseInt(lineitem, colStart, i));
                     } else if (col == 4) {
-                        key.fst.add(parseInt(lineitem, colStart, i));
-                        key.snd.increment();
+                        upd.accept(key, parseInt(lineitem, colStart, i));
                         while (lineitem[i] != '\n') ++i;
                         col = 0;
                         colStart = i + 1;
@@ -167,10 +156,24 @@ public class Database {
         };
 
 
+    }
+
+    void calculatePerSegment(PairArr orderToSegment, byte[] lineitem) {
+
+
+        int ft = lineitem.length / 3;
+        for (; ft < lineitem.length && lineitem[ft] != '\n'; ++ft) ;
+        int tt = ft + (lineitem.length - ft) / 2;
+        for (; tt < lineitem.length && lineitem[tt] != '\n'; ++tt) ;
+
+
+
+
+
         try {
-            executor.invokeAll(List.of(f.apply(0, ft),
-                    f.apply(ft, tt),
-                    f.apply(tt, lineitem.length)));
+            executor.invokeAll(List.of(generateCalculateTask(lineitem, orderToSegment, 0, ft, Pair::upd1),
+                    generateCalculateTask(lineitem, orderToSegment, ft, tt, Pair::upd2),
+                    generateCalculateTask(lineitem, orderToSegment, tt, lineitem.length, Pair::upd3)));
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -214,10 +217,25 @@ public class Database {
     }
 
     static class Pair {
-        LongAdder fst = new LongAdder(), snd = new LongAdder();
+        long fst1, fst2, fst3, snd1, snd2, snd3;
+
+        static void upd1(Pair x, int delta) {
+            x.fst1 += delta;
+            ++x.snd1;
+        }
+
+        static void upd2(Pair x, int delta) {
+            x.fst2 += delta;
+            ++x.snd2;
+        }
+
+        static void upd3(Pair x, int delta) {
+            x.fst3 += delta;
+            ++x.snd3;
+        }
 
         long ans() {
-            return (100 * fst.longValue()) / snd.longValue();
+            return (100 * (fst1 + fst2 + fst3)) / (snd1 + snd2 + snd3);
         }
     }
 
