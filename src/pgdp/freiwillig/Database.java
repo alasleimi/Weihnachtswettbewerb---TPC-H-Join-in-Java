@@ -8,8 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -22,18 +21,18 @@ public class Database {
     // TODO have fun :)
 
 
-    private static ConcurrentMap<String, Pair> avg;
+    private static HashMap<String, Pair> avg;
 
     static class Pair {
-        LongAdder fst, snd;
+        long fst, snd;
 
         Pair() {
-            fst = new LongAdder();
-            snd = new LongAdder();
+            fst = 0;
+            snd = 0;
         }
 
         long ans() {
-            return (100 * fst.longValue()) / snd.longValue();
+            return (100 * fst) / snd;
         }
     }
 
@@ -50,20 +49,57 @@ public class Database {
 
     }
 
-    public static ConcurrentHashMap<Integer, Pair> segPerCust() {
-        try {
-            ConcurrentHashMap<Integer, Pair> a = new ConcurrentHashMap<>();
-            //avg = new ConcurrentHashMap<>(1_000_000);
-            avg = new ConcurrentSkipListMap<>();
 
-            Files.lines(baseDataDirectory.resolve("customer.tbl"))
-                    .unordered()
-                    .parallel()
-                    .forEach(x -> {
-                        int key = 0;
-                        int j = 0;
-                        int o = 0;
-                        for (int i = 0; ; i++) {
+    public static Pair[] segPerCust() {
+        try {
+            Pair[] a = new Pair[1 << 24];
+            //avg = new ConcurrentHashMap<>(1_000_000);
+            avg = new HashMap<String, Pair>();
+            byte[] b = Files.readAllBytes(baseDataDirectory.resolve("customer.tbl"));
+
+            int j1 = 0;
+            int o1 = 0;
+
+            int key = 0;
+            //System.out.println(new String(Arrays.copyOfRange(b,0,b.length)));
+            for (int i = 0; i < b.length; i++) {
+
+                //System.out.print(ch);
+
+                if (b[i] == '|') {
+
+                    if (j1 == 1) {
+                        key = parseInt(b, o1, i);
+
+                    } else if (j1 == 6) {
+
+
+                        //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
+                        a[key] = avg.computeIfAbsent(new String(Arrays.copyOfRange(b, o1, i)), y -> new Pair());
+                        while (b[i] != '\n') ++i;
+                        j1 = 0;
+                        o1 = i + 1;
+                        continue;
+                    }
+                    ++j1;
+                    o1 = i + 1;
+
+
+                }
+
+
+            }
+            /**
+             System.out.println(line);
+
+             Files.lines(baseDataDirectory.resolve("customer.tbl"))
+             .unordered()
+             .parallel()
+             .forEach(x -> {
+             int key = 0;
+             int j = 0;
+             int o = 0;
+             for (int i = 0; ; i++) {
 
                             if (x.charAt(i) == '|') {
                                 if (j == 1) {
@@ -118,7 +154,19 @@ public class Database {
         for (char c = s.charAt(i); c > '9' || c < '1'; c = s.charAt(++i)) ;
         for (; i < end; ++i) {
             q *= 10;
-            q += s.charAt(i) - '0';
+            q += s.charAt(i) - '0'; // - 0
+        }
+        return q;
+    }
+
+    static int parseInt(byte[] s, int start, int end) {
+        int i = start;
+        int q = 0;
+
+        for (byte c = s[i]; c > '9' || c < '1'; c = s[++i]) ;
+        for (; i < end; ++i) {
+            q *= 10;
+            q += s[i] - '0'; // - 0
         }
         return q;
     }
@@ -132,63 +180,78 @@ public class Database {
             // System.out.println(b.size());
             try {
 
-                ConcurrentHashMap<Integer, Pair> a = new ConcurrentHashMap<>();
-                Files.lines(baseDataDirectory.resolve("orders.tbl"))
-                        .unordered()
-                        .parallel()
-                        .forEach(x -> {
-                            int key = 0;
-                            int j = 0;
-                            int o = 0;
-                            for (int i = 0; ; i++) {
-
-                                if (x.charAt(i) == '|') {
-                                    if (j == 0) {
-                                        key = parseInt(x, o, i);
-                                    } else if (j == 1) {
-                                        a.put(key, sPC.get(parseInt(x, o, i)));
-
-                                        break;
-                                    }
-                                    o = i + 1;
-                                    ++j;
-
-                                }
+                Pair[] a = new Pair[1 << 24];
 
 
-                            }
+                byte[] b = Files.readAllBytes(baseDataDirectory.resolve("orders.tbl"));
 
-                        });
+                int j1 = 0;
+                int o1 = 0;
 
+                int key1 = 0;
+                //System.out.println(new String(Arrays.copyOfRange(b,0,b.length)));
+                for (int i = 0; i < b.length; i++) {
 
-                Files.lines(baseDataDirectory.resolve("lineitem.tbl"))
-                        .unordered()
-                        .parallel()
-                        .forEach(x -> {
-                            //custom split
-                            Pair key = null;
-                            int j = 0;
-                            int o = 0;
-                            for (int i = 0; ; i++) {
+                    //System.out.print(ch);
 
-                                if (x.charAt(i) == '|') {
-                                    if (j == 0) {
-                                        key = a.get(parseInt(x, o, i));
-                                    } else if (j == 4) {
-                                        key.fst.add(parseInt(x, o, i));
-                                        key.snd.increment();
-                                        break;
-                                    }
-                                    o = i + 1;
-                                    ++j;
+                    if (b[i] == '|') {
 
-                                }
+                        if (j1 == 0) {
+                            key1 = parseInt(b, o1, i);
+                            //System.out.println(key1);
 
+                        } else if (j1 == 1) {
+                            //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
+                            a[key1] = sPC[parseInt(b, o1, i)];
+                            while (b[i] != '\n') ++i;
+                            j1 = 0;
+                            o1 = i + 1;
+                            continue;
+                        }
+                        ++j1;
+                        o1 = i + 1;
 
-                            }
-                            //System.out.println(answer[0] + " " + answer[1]);
+                    }
+                }
 
-                        });
+                //var start = System.nanoTime();
+                b = Files.readAllBytes(baseDataDirectory.resolve("lineitem.tbl"));
+                //var end = System.nanoTime();
+                //System.out.println((end - start)/1_000_000);
+                //start = System.nanoTime();
+                int j2 = 0;
+                int o2 = 0;
+
+                Pair key2 = null;
+                //System.out.println(new String(Arrays.copyOfRange(b,0,b.length)));
+                for (int i = 0; i < b.length; i++) {
+                    //char ch = (char) b[i];
+                    //System.out.print(ch);
+
+                    if (b[i] == '|') {
+
+                        if (j2 == 0) {
+                            key2 = a[parseInt(b, o2, i)];
+                            //System.out.println(key2);
+
+                        } else if (j2 == 4) {
+                            //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
+
+                            //System.out.println(tmp);
+                            key2.fst += parseInt(b, o2, i);
+                            ++key2.snd;
+                            while (b[i] != '\n') ++i;
+                            j2 = 0;
+                            o2 = i + 1;
+                            continue;
+                        }
+                        ++j2;
+                        o2 = i + 1;
+
+                    }
+                }
+                //end = System.nanoTime();
+                //System.out.println((end - start)/1_000_000);
             } catch (IOException e) {
                 throw new RuntimeException("no file");
             }
