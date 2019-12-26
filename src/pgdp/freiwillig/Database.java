@@ -136,7 +136,7 @@ public class Database {
 
         int ft = lineitem.length / 3;
         for (; ft < lineitem.length && lineitem[ft] != '\n'; ++ft) ;
-        int tt = (lineitem.length - ft) / 2;
+        int tt = ft + (lineitem.length - ft) / 2;
         for (; tt < lineitem.length && lineitem[tt] != '\n'; ++tt) ;
 
 
