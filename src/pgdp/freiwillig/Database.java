@@ -53,9 +53,9 @@ public class Database {
     }
 
 
-    public static HashMap<Integer, Pair> segPerCust() {
+    public static PairArr segPerCust() {
         try {
-            HashMap<Integer, Pair> a = new HashMap<>();
+            PairArr a = new PairArr(150_005);
             //avg = new ConcurrentHashMap<>(1_000_000);
             avg = new HashMap<String, Pair>();
 
@@ -154,6 +154,44 @@ public class Database {
         return q;
     }
 
+    static class PairArr {
+        Pair[] fst;
+        Pair[] snd;
+
+
+        // 2 < initSize < INTEGER.MAX_VALUE  - 2
+        // because we can't have an array of size > Max_VALUE - 2;
+        // this class is only made to handle the case where a key is > Max_VALUE - 1
+        PairArr(int initSz) {
+            fst = new Pair[initSz];
+        }
+
+
+        void put(int key, Pair value) {
+            if (key < fst.length) {
+                fst[key] = value;
+            } else {
+                key -= fst.length;
+                if (snd == null) {
+                    System.out.println("allocate second");
+                    snd = new Pair[Integer.MAX_VALUE - fst.length];
+                }
+                snd[key] = value;
+            }
+        }
+
+        Pair get(int key) {
+            if (key < fst.length) {
+                return fst[key];
+            }
+            return snd[key - fst.length];
+
+
+        }
+
+
+    }
+
 
     public long getAverageQuantityPerMarketSegment(String marketsegment) {
         if (!cache) {
@@ -164,7 +202,7 @@ public class Database {
             try {
 
                 //Pair[] a = new Pair[1 << 24];
-                HashMap<Integer, Pair> a = new HashMap<>();
+                PairArr a = new PairArr(6_000_005);
                 // var e1 = System.nanoTime();
                 var fin2 = new FileInputStream(baseDataDirectory.resolve("orders.tbl").toFile());
                 var ch2 = fin2.getChannel();
