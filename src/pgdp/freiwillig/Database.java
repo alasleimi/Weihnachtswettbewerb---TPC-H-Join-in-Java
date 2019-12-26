@@ -53,9 +53,9 @@ public class Database {
     }
 
 
-    public static Pair[] segPerCust() {
+    public static HashMap<Integer, Pair> segPerCust() {
         try {
-            Pair[] a = new Pair[1 << 24];
+            HashMap<Integer, Pair> a = new HashMap<>();
             //avg = new ConcurrentHashMap<>(1_000_000);
             avg = new HashMap<String, Pair>();
 
@@ -88,7 +88,7 @@ public class Database {
 
 
                         //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
-                        a[key] = avg.computeIfAbsent(new String(Arrays.copyOfRange(b, o1, i)), y -> new Pair());
+                        a.put(key, avg.computeIfAbsent(new String(Arrays.copyOfRange(b, o1, i)), y -> new Pair()));
                         while (b[i] != '\n') ++i;
                         j1 = 0;
                         o1 = i + 1;
@@ -163,8 +163,8 @@ public class Database {
             // System.out.println(b.size());
             try {
 
-                Pair[] a = new Pair[1 << 24];
-
+                //Pair[] a = new Pair[1 << 24];
+                HashMap<Integer, Pair> a = new HashMap<>();
                 // var e1 = System.nanoTime();
                 var fin2 = new FileInputStream(baseDataDirectory.resolve("orders.tbl").toFile());
                 var ch2 = fin2.getChannel();
@@ -194,7 +194,7 @@ public class Database {
 
                         } else if (j1 == 1) {
                             //System.out.println(key + " "+ new String(Arrays.copyOfRange(b,o1,i)));
-                            a[key1] = sPC[parseInt(b, o1, i)];
+                            a.put(key1, sPC.get(parseInt(b, o1, i)));
                             while (b[i] != '\n') ++i;
                             j1 = 0;
                             o1 = i + 1;
@@ -230,7 +230,7 @@ public class Database {
                     if (b[i] == '|') {
 
                         if (j2 == 0) {
-                            key2 = a[parseInt(b, o2, i)];
+                            key2 = a.get(parseInt(b, o2, i));
                             //System.out.println(key2);
 
                         } else if (j2 == 4) {
