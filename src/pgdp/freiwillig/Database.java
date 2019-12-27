@@ -39,6 +39,7 @@ public class Database {
             Field field = Unsafe.class.getDeclaredField("theUnsafe");
             field.setAccessible(true);
             unsafe = (sun.misc.Unsafe) field.get(null);
+
         } catch (NoSuchFieldException | IllegalAccessException e) {
             e.printStackTrace();
         }
@@ -70,23 +71,23 @@ public class Database {
         avgSegment = new HashMap<>();
 
         int col = 0;
-        int colStart = 0;
+        long colStart = address;
 
         int key = 0;
+        long end = customer.capacity() + address;
+        for (long i = colStart; i < end; i++) {
 
-        for (int i = 0; i < customer.capacity(); i++) {
-
-            if (unsafe.getByte(address + i) == '|') {
+            if (unsafe.getByte(i) == '|') {
 
                 if (col == 1) {
 
-                    key = parseInt(address, colStart, i);
+                    key = parseInt(colStart, i);
 
                 } else if (col == 6) {
-                    byte[] x = new byte[i - colStart];
+                    byte[] x = new byte[(int) (i - colStart)];
                     //customer.get(colStart, x, 0, x.length);
                     for (int j = 0; j < x.length; ++j)
-                        x[j] = unsafe.getByte(address + colStart + j);
+                        x[j] = unsafe.getByte(colStart + j);
 
 
                     customerToSegment
@@ -95,7 +96,7 @@ public class Database {
                                             new String(x),
                                             y -> new long[nSolts]));
 
-                    while (unsafe.getByte(address + i) != '\n') ++i;
+                    while (unsafe.getByte(i) != '\n') ++i;
                     col = 0;
                     colStart = i + 1;
                     continue;
@@ -117,20 +118,21 @@ public class Database {
         System.out.println(db.getAverageQuantityPerMarketSegment("AUTOMOBILE"));
         System.out.println(db.getAverageQuantityPerMarketSegment("BUILDING"));
         System.out.println(db.getAverageQuantityPerMarketSegment("BUILDING"));
+        db.getAverageQuantityPerMarketSegment("AUTOMOBILE");
         var e = System.nanoTime();
         System.out.println((e - s) / 1_000_000);
 
     }
 
 
-    static int parseInt(long address, int i, int end) {
+    static int parseInt(long i, long end) {
 
         int q = 0;
 
-        for (byte c = unsafe.getByte(address + i); c > '9' || c < '1'; c = unsafe.getByte(address + ++i)) ;
+        for (byte c = unsafe.getByte(i); c > '9' || c < '1'; c = unsafe.getByte(++i)) ;
         for (; i < end; ++i) {
             q *= 10;
-            q += unsafe.getByte(address + i) - '0'; // - 0
+            q += unsafe.getByte(i) - '0'; // - 0
         }
         return q;
     }
@@ -147,24 +149,24 @@ public class Database {
             throw new AssertionError(e);
         }
 
-        final long finalAddress = address;
-        BiFunction<Integer, Integer, Callable<Object>> f = (s, e) -> () -> {
+
+        BiFunction<Long, Long, Callable<Object>> f = (s, e) -> () -> {
             int col = 0;
-            int colStart = s;
+            long colStart = s;
 
             int key = 0;
 
-            for (int i = s; i < e; i++) {
+            for (long i = colStart; i < e; i++) {
 
-                if (unsafe.getByte(finalAddress + i) == '|') {
+                if (unsafe.getByte(i) == '|') {
 
                     if (col == 0) {
                         //System.out.println((char)orders[colStart]);
-                        key = parseInt(finalAddress, colStart, i);
+                        key = parseInt(colStart, i);
                     } else if (col == 1) {
 
-                        orderToSegment.put(key, customerToSegment.get(parseInt(finalAddress, colStart, i)));
-                        while (unsafe.getByte(finalAddress + i) != '\n') ++i;
+                        orderToSegment.put(key, customerToSegment.get(parseInt(colStart, i)));
+                        while (unsafe.getByte(i) != '\n') ++i;
                         col = 0;
                         colStart = i + 1;
                         continue;
@@ -183,7 +185,7 @@ public class Database {
         for (int i = nCPU; i > 0; --i) {
             int currEnd = old + (orders.capacity() - old) / i;
             for (; currEnd < orders.capacity() && orders.get(currEnd) != '\n'; ++currEnd) ;
-            tasks.add(f.apply(old, currEnd));
+            tasks.add(f.apply(address + old, currEnd + address));
             old = currEnd + 1;
         }
         try {
@@ -196,35 +198,38 @@ public class Database {
         return orderToSegment;
     }
 
-    Callable<Object> generateCalculateTask(long address, PairArr orderToSegment, int s, int e, int index) {
-        return () -> {
-            int col = 0;
-            int colStart = s;
-            long[] key = null;
-            for (int i = s; i < e; i++) {
+    Object calculateSubTask(PairArr orderToSegment, long startAddress, long end, int index) {
 
-                if (unsafe.getByte(address + i) == '|') {
+        long[] key;
+        for (long i = startAddress; i < end; ) {
 
-                    if (col == 0) {
-                        key = orderToSegment.get(parseInt(address, colStart, i));
-                    } else if (col == 4) {
-                        key[index - 1] += parseInt(address, colStart, i);
-                        ++key[index];
-                        while (unsafe.getByte(address + i) != '\n') ++i;
-                        col = 0;
-                        colStart = i + 1;
-                        continue;
-                    }
-                    ++col;
-                    colStart = i + 1;
 
-                }
+            byte tmp;
+            int q = 0;
+            while ((tmp = unsafe.getByte(i++)) != '|') {
+                q *= 10;
+                q += tmp - '0';
             }
-            return null;
-        };
+            // System.out.println("key" + q);
+            key = orderToSegment.get(q);
+            while (unsafe.getByte(i++) != '|') ;//skip 2nd
+            while (unsafe.getByte(i++) != '|') ;//skip 3rd
+            while (unsafe.getByte(i++) != '|') ;//skip 4th
+            q = 0;
+            while ((tmp = unsafe.getByte(i++)) != '|') {
+                q *= 10;
+                q += tmp - '0';
+            }
+            key[index - 1] += q;
+            ++key[index];
+            while (unsafe.getByte(i++) != '\n') ; //skip rest
+        }
+
+        return null;
 
 
     }
+
 
     void calculatePerSegment(PairArr orderToSegment, MappedByteBuffer lineitem) {
 
@@ -243,8 +248,10 @@ public class Database {
         for (int i = nCPU; i > 0; --i) {
             int currEnd = old + (lineitem.capacity() - old) / i;
             for (; currEnd < lineitem.capacity() && lineitem.get(currEnd) != '\n'; ++currEnd) ;
-
-            tasks.add(generateCalculateTask(address, orderToSegment, old, currEnd, 2 * i - 1));
+            var startAddress = old + address;
+            var end = currEnd + address;
+            var num = 2 * i - 1;
+            tasks.add(() -> calculateSubTask(orderToSegment, startAddress, end, num));
             old = currEnd + 1;
         }
 
@@ -256,6 +263,7 @@ public class Database {
         }
 
     }
+
 
     Callable<MappedByteBuffer> readTable(String tableName) {
 
@@ -280,6 +288,7 @@ public class Database {
 
             try {
                 PairArr customerToSegement = getCustomerToSegment(customer.get());
+
                 PairArr orderToSegment = getOrderToSegment(customerToSegement, orders.get());
                 calculatePerSegment(orderToSegment, lineitem.get());
 
