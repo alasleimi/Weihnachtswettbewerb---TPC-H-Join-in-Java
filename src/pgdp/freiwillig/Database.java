@@ -2,7 +2,10 @@ package pgdp.freiwillig;
 
 // TODO Imports
 
+import sun.misc.Unsafe;
+
 import java.io.FileInputStream;
+import java.lang.reflect.Field;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
@@ -14,6 +17,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiFunction;
+
 
 public class Database {
     // TODO have fun :)
@@ -37,7 +41,23 @@ public class Database {
 
     public static PairArr getCustomerToSegment(MappedByteBuffer customer) {
 
+
         PairArr customerToSegment = new PairArr(150_005);
+        Unsafe unsafe;
+        long a;
+        try {
+            Field field = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            field.setAccessible(true);
+            unsafe = (sun.misc.Unsafe) field.get(null);
+            var f = customer.getClass().getMethod("address");
+            f.setAccessible(true);
+            a = (long) f.invoke(customer);
+
+
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+
         avgSegment = new HashMap<>();
 
         int col = 0;
@@ -47,7 +67,7 @@ public class Database {
 
         for (int i = 0; i < customer.capacity(); i++) {
 
-            if (customer.get(i) == '|') {
+            if (unsafe.getByte(a + i) == '|') {
 
                 if (col == 1) {
 
@@ -107,8 +127,8 @@ public class Database {
     }
 
     PairArr getOrderToSegment(PairArr customerToSegment, MappedByteBuffer orders) {
+
         PairArr orderToSegment = new PairArr(6_000_005);
-        //var sr = System.nanoTime();
 
 
         BiFunction<Integer, Integer, Callable<Object>> f = (s, e) -> () -> {
@@ -154,9 +174,6 @@ public class Database {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
-        //var e = System.nanoTime();
-        // System.out.println((e - sr) / 1_000_000);
 
 
         return orderToSegment;
@@ -219,7 +236,9 @@ public class Database {
         return () -> {
 
             var ch = new FileInputStream(baseDataDirectory.resolve(tableName).toFile()).getChannel();
-            return ch.map(FileChannel.MapMode.READ_ONLY, 0, ch.size());
+            var buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, ch.size());
+            //buf.load(); ???
+            return buf;
 
         };
     }
@@ -278,6 +297,7 @@ public class Database {
             }
 
         }
+
 
         long[] get(int key) {
             return key < fst.length ? fst[key] : snd[key - fst.length];
