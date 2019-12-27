@@ -7,20 +7,23 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 
 public class Database {
     // TODO have fun :)
+    private static final int nCPU = Runtime.getRuntime().availableProcessors();
+    //4;
+    private static final ExecutorService executor = Executors.newFixedThreadPool(nCPU);
+    private static final int nSolts = 2 * nCPU;
+    private static HashMap<String, long[]> avgSegment;
 
-    private static final ExecutorService executor = Executors.newFixedThreadPool(3);
-    private static HashMap<String, Pair> avgSegment;
     private static boolean cache = false;
     private static Path baseDataDirectory = Paths.get("C:\\Users\\ACER\\Downloads\\data");
 
@@ -55,7 +58,7 @@ public class Database {
                             .put(key,
                                     avgSegment.computeIfAbsent(
                                             new String(Arrays.copyOfRange(customer, colStart, i)),
-                                            y -> new Pair()));
+                                            y -> new long[nSolts]));
 
                     while (customer[i] != '\n') ++i;
                     col = 0;
@@ -81,6 +84,7 @@ public class Database {
         System.out.println(db.getAverageQuantityPerMarketSegment("BUILDING"));
         var e = System.nanoTime();
         System.out.println((e - s) / 1_000_000);
+
     }
 
 
@@ -88,7 +92,7 @@ public class Database {
 
         int q = 0;
 
-        for (byte c = s[i]; c > '9' || c < '1'; c = s[++i]) ;
+        for (; s[i] > '9' || s[i] < '1'; ++i) ;
         for (; i < end; ++i) {
             q *= 10;
             q += s[i] - '0'; // - 0
@@ -98,42 +102,65 @@ public class Database {
 
     PairArr getOrderToSegment(PairArr customerToSegment, byte[] orders) {
         PairArr orderToSegment = new PairArr(6_000_005);
+        //var sr = System.nanoTime();
 
-        int col = 0;
-        int colStart = 0;
 
-        int key = 0;
+        BiFunction<Integer, Integer, Callable<Object>> f = (s, e) -> () -> {
+            int col = 0;
+            int colStart = s;
 
-        for (int i = 0; i < orders.length; i++) {
+            int key = 0;
 
-            if (orders[i] == '|') {
+            for (int i = s; i < e; i++) {
 
-                if (col == 0) {
-                    key = parseInt(orders, colStart, i);
-                } else if (col == 1) {
+                if (orders[i] == '|') {
 
-                    orderToSegment.put(key, customerToSegment.get(parseInt(orders, colStart, i)));
-                    while (orders[i] != '\n') ++i;
-                    col = 0;
+                    if (col == 0) {
+                        //System.out.println((char)orders[colStart]);
+                        key = parseInt(orders, colStart, i);
+                    } else if (col == 1) {
+
+                        orderToSegment.put(key, customerToSegment.get(parseInt(orders, colStart, i)));
+                        while (orders[i] != '\n') ++i;
+                        col = 0;
+                        colStart = i + 1;
+                        continue;
+                    }
+                    ++col;
                     colStart = i + 1;
-                    continue;
-                }
-                ++col;
-                colStart = i + 1;
 
+                }
             }
+            return null;
+        };
+        final ArrayList<Callable<Object>> tasks = new ArrayList<>(nCPU);
+
+
+        int old = 0;
+        for (int i = nCPU; i > 0; --i) {
+            int currEnd = old + (orders.length - old) / i;
+            for (; currEnd < orders.length && orders[currEnd] != '\n'; ++currEnd) ;
+            tasks.add(f.apply(old, currEnd));
+            old = currEnd + 1;
+        }
+        try {
+            executor.invokeAll(tasks);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
 
+        //var e = System.nanoTime();
+        // System.out.println((e - sr) / 1_000_000);
+
+
         return orderToSegment;
-
-
     }
 
-    Callable<Object> generateCalculateTask(byte[] lineitem, PairArr orderToSegment, int s, int e, BiConsumer<Pair, Integer> upd) {
+    Callable<Object> generateCalculateTask(byte[] lineitem, PairArr orderToSegment, int s, int e, int index) {
         return () -> {
             int col = 0x0;
             int colStart = s;
-            Pair key = null;
+            long[] key = null;
             for (int i = s; i < e; i++) {
 
                 if (lineitem[i] == '|') {
@@ -141,7 +168,8 @@ public class Database {
                     if (col == 0) {
                         key = orderToSegment.get(parseInt(lineitem, colStart, i));
                     } else if (col == 4) {
-                        upd.accept(key, parseInt(lineitem, colStart, i));
+                        key[index - 1] += parseInt(lineitem, colStart, i);
+                        ++key[index];
                         while (lineitem[i] != '\n') ++i;
                         col = 0;
                         colStart = i + 1;
@@ -160,20 +188,20 @@ public class Database {
 
     void calculatePerSegment(PairArr orderToSegment, byte[] lineitem) {
 
+        final ArrayList<Callable<Object>> tasks = new ArrayList<>(nCPU);
 
-        int ft = lineitem.length / 3;
-        for (; ft < lineitem.length && lineitem[ft] != '\n'; ++ft) ;
-        int tt = ft + (lineitem.length - ft) / 2;
-        for (; tt < lineitem.length && lineitem[tt] != '\n'; ++tt) ;
+        int old = 0;
+        for (int i = nCPU; i > 0; --i) {
+            int currEnd = old + (lineitem.length - old) / i;
+            for (; currEnd < lineitem.length && lineitem[currEnd] != '\n'; ++currEnd) ;
 
-
-
+            tasks.add(generateCalculateTask(lineitem, orderToSegment, old, currEnd, 2 * i - 1));
+            old = currEnd + 1;
+        }
 
 
         try {
-            executor.invokeAll(List.of(generateCalculateTask(lineitem, orderToSegment, 0, ft, Pair::upd1),
-                    generateCalculateTask(lineitem, orderToSegment, ft, tt, Pair::upd2),
-                    generateCalculateTask(lineitem, orderToSegment, tt, lineitem.length, Pair::upd3)));
+            executor.invokeAll(tasks);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -194,6 +222,7 @@ public class Database {
         };
     }
 
+
     public long getAverageQuantityPerMarketSegment(String marketsegment) {
         if (!cache) {
 
@@ -213,57 +242,42 @@ public class Database {
             cache = true;
         }
 
-        return avgSegment.get(marketsegment).ans();
+        return ans(avgSegment.get(marketsegment));
     }
 
-    static class Pair {
-        long fst1, fst2, fst3, snd1, snd2, snd3;
-
-        static void upd1(Pair x, int delta) {
-            x.fst1 += delta;
-            ++x.snd1;
-        }
-
-        static void upd2(Pair x, int delta) {
-            x.fst2 += delta;
-            ++x.snd2;
-        }
-
-        static void upd3(Pair x, int delta) {
-            x.fst3 += delta;
-            ++x.snd3;
-        }
-
-        long ans() {
-            return (100 * (fst1 + fst2 + fst3)) / (snd1 + snd2 + snd3);
-        }
+    static long ans(long[] avg) {
+        long[] count = new long[2];
+        for (int i = 0; i < avg.length; ++i)
+            count[i & 1] += avg[i];
+        return (100 * count[0]) / count[1];
     }
 
     static class PairArr {
-        final Pair[] fst;
-        Pair[] snd;
+        final long[][] fst;
+        long[][] snd;
 
         // 2 < initSize < INTEGER.MAX_VALUE  - 2
         // because we can't have an array of size > Max_VALUE - 2;
         // this class is  made to handle the cases where a key is > Max_VALUE - 3
         PairArr(int initSz) {
-            fst = new Pair[initSz];
+            fst = new long[initSz][];
         }
 
-        void put(int key, Pair value) {
+        void put(int key, long[] value) {
             if (key < fst.length) {
                 fst[key] = value;
             } else {
-                key -= fst.length;
+
                 if (snd == null) {
                     //System.out.println("allocate second");
-                    snd = new Pair[Integer.MAX_VALUE - fst.length];
+                    snd = new long[Integer.MAX_VALUE - fst.length][];
                 }
-                snd[key] = value;
+                snd[key - fst.length] = value;
             }
+
         }
 
-        Pair get(int key) {
+        long[] get(int key) {
             return key < fst.length ? fst[key] : snd[key - fst.length];
         }
 
