@@ -55,7 +55,8 @@ public class Database {
 
                 } else if (col == 6) {
                     byte[] x = new byte[i - colStart];
-                    customer.get(colStart, x);
+                    customer.get(colStart, x, 0, x.length);
+
 
                     customerToSegment
                             .put(key,
