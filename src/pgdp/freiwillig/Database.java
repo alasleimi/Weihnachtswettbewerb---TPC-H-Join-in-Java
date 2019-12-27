@@ -55,7 +55,9 @@ public class Database {
 
                 } else if (col == 6) {
                     byte[] x = new byte[i - colStart];
-                    customer.get(colStart, x, 0, x.length);
+                    //customer.get(colStart, x, 0, x.length);
+                    for (int j = 0; j < x.length; ++j)
+                        x[j] = customer.get(colStart + j);
 
 
                     customerToSegment
