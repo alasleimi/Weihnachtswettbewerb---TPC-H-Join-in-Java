@@ -8,7 +8,6 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -36,7 +35,7 @@ public class Database {
     }
 
 
-    public static PairArr getCustomerToSegment(byte[] customer) {
+    public static PairArr getCustomerToSegment(MappedByteBuffer customer) {
 
         PairArr customerToSegment = new PairArr(150_005);
         avgSegment = new HashMap<>();
@@ -46,21 +45,25 @@ public class Database {
 
         int key = 0;
 
-        for (int i = 0; i < customer.length; i++) {
+        for (int i = 0; i < customer.capacity(); i++) {
 
-            if (customer[i] == '|') {
+            if (customer.get(i) == '|') {
 
                 if (col == 1) {
 
                     key = parseInt(customer, colStart, i);
+
                 } else if (col == 6) {
+                    byte[] x = new byte[i - colStart];
+                    customer.get(colStart, x);
+
                     customerToSegment
                             .put(key,
                                     avgSegment.computeIfAbsent(
-                                            new String(Arrays.copyOfRange(customer, colStart, i)),
+                                            new String(x),
                                             y -> new long[nSolts]));
 
-                    while (customer[i] != '\n') ++i;
+                    while (customer.get(i) != '\n') ++i;
                     col = 0;
                     colStart = i + 1;
                     continue;
@@ -88,19 +91,19 @@ public class Database {
     }
 
 
-    static int parseInt(byte[] s, int i, int end) {
+    static int parseInt(MappedByteBuffer s, int i, int end) {
 
         int q = 0;
 
-        for (; s[i] > '9' || s[i] < '1'; ++i) ;
+        for (byte c = s.get(i); c > '9' || c < '1'; c = s.get(++i)) ;
         for (; i < end; ++i) {
             q *= 10;
-            q += s[i] - '0'; // - 0
+            q += s.get(i) - '0'; // - 0
         }
         return q;
     }
 
-    PairArr getOrderToSegment(PairArr customerToSegment, byte[] orders) {
+    PairArr getOrderToSegment(PairArr customerToSegment, MappedByteBuffer orders) {
         PairArr orderToSegment = new PairArr(6_000_005);
         //var sr = System.nanoTime();
 
@@ -113,7 +116,7 @@ public class Database {
 
             for (int i = s; i < e; i++) {
 
-                if (orders[i] == '|') {
+                if (orders.get(i) == '|') {
 
                     if (col == 0) {
                         //System.out.println((char)orders[colStart]);
@@ -121,7 +124,7 @@ public class Database {
                     } else if (col == 1) {
 
                         orderToSegment.put(key, customerToSegment.get(parseInt(orders, colStart, i)));
-                        while (orders[i] != '\n') ++i;
+                        while (orders.get(i) != '\n') ++i;
                         col = 0;
                         colStart = i + 1;
                         continue;
@@ -138,8 +141,8 @@ public class Database {
 
         int old = 0;
         for (int i = nCPU; i > 0; --i) {
-            int currEnd = old + (orders.length - old) / i;
-            for (; currEnd < orders.length && orders[currEnd] != '\n'; ++currEnd) ;
+            int currEnd = old + (orders.capacity() - old) / i;
+            for (; currEnd < orders.capacity() && orders.get(currEnd) != '\n'; ++currEnd) ;
             tasks.add(f.apply(old, currEnd));
             old = currEnd + 1;
         }
@@ -156,21 +159,21 @@ public class Database {
         return orderToSegment;
     }
 
-    Callable<Object> generateCalculateTask(byte[] lineitem, PairArr orderToSegment, int s, int e, int index) {
+    Callable<Object> generateCalculateTask(MappedByteBuffer lineitem, PairArr orderToSegment, int s, int e, int index) {
         return () -> {
             int col = 0x0;
             int colStart = s;
             long[] key = null;
             for (int i = s; i < e; i++) {
 
-                if (lineitem[i] == '|') {
+                if (lineitem.get(i) == '|') {
 
                     if (col == 0) {
                         key = orderToSegment.get(parseInt(lineitem, colStart, i));
                     } else if (col == 4) {
                         key[index - 1] += parseInt(lineitem, colStart, i);
                         ++key[index];
-                        while (lineitem[i] != '\n') ++i;
+                        while (lineitem.get(i) != '\n') ++i;
                         col = 0;
                         colStart = i + 1;
                         continue;
@@ -186,14 +189,14 @@ public class Database {
 
     }
 
-    void calculatePerSegment(PairArr orderToSegment, byte[] lineitem) {
+    void calculatePerSegment(PairArr orderToSegment, MappedByteBuffer lineitem) {
 
         final ArrayList<Callable<Object>> tasks = new ArrayList<>(nCPU);
 
         int old = 0;
         for (int i = nCPU; i > 0; --i) {
-            int currEnd = old + (lineitem.length - old) / i;
-            for (; currEnd < lineitem.length && lineitem[currEnd] != '\n'; ++currEnd) ;
+            int currEnd = old + (lineitem.capacity() - old) / i;
+            for (; currEnd < lineitem.capacity() && lineitem.get(currEnd) != '\n'; ++currEnd) ;
 
             tasks.add(generateCalculateTask(lineitem, orderToSegment, old, currEnd, 2 * i - 1));
             old = currEnd + 1;
@@ -208,16 +211,12 @@ public class Database {
 
     }
 
-    Callable<byte[]> readTable(String tableName) {
+    Callable<MappedByteBuffer> readTable(String tableName) {
 
         return () -> {
 
             var ch = new FileInputStream(baseDataDirectory.resolve(tableName).toFile()).getChannel();
-            int size = (int) ch.size();
-            MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
-            byte[] table = new byte[size];
-            buf.get(table);
-            return table;
+            return ch.map(FileChannel.MapMode.READ_ONLY, 0, ch.size());
 
         };
     }
