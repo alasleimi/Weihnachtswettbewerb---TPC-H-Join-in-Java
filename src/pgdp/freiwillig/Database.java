@@ -198,7 +198,7 @@ public class Database {
 
     Callable<Object> generateCalculateTask(long address, PairArr orderToSegment, int s, int e, int index) {
         return () -> {
-            int col = 0x0;
+            int col = 0;
             int colStart = s;
             long[] key = null;
             for (int i = s; i < e; i++) {
@@ -263,7 +263,9 @@ public class Database {
 
             var ch = new FileInputStream(baseDataDirectory.resolve(tableName).toFile()).getChannel();
             //buf.load(); ???
-            return ch.map(FileChannel.MapMode.READ_ONLY, 0, ch.size());
+            var buff = ch.map(FileChannel.MapMode.READ_ONLY, 0, ch.size());
+            buff.load();
+            return buff;
 
         };
     }
