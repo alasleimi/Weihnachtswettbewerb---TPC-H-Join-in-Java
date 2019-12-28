@@ -151,30 +151,22 @@ public class Database {
 
 
         BiFunction<Long, Long, Callable<Object>> f = (s, e) -> () -> {
-            int col = 0;
-            long colStart = s;
 
-            int key = 0;
-
-            for (long i = colStart; i < e; i++) {
-
-                if (unsafe.getByte(i) == '|') {
-
-                    if (col == 0) {
-                        //System.out.println((char)orders[colStart]);
-                        key = parseInt(colStart, i);
-                    } else if (col == 1) {
-
-                        orderToSegment.put(key, customerToSegment.get(parseInt(colStart, i)));
-                        while (unsafe.getByte(i) != '\n') ++i;
-                        col = 0;
-                        colStart = i + 1;
-                        continue;
-                    }
-                    ++col;
-                    colStart = i + 1;
-
+            int key;
+            for (long i = s; i < e; ) {
+                byte tmp;
+                key = 0;
+                while ((tmp = unsafe.getByte(i++)) != '|') {
+                    key *= 10;
+                    key += tmp - '0';
                 }
+                int custKey = 0;
+                while ((tmp = unsafe.getByte(i++)) != '|') {
+                    custKey *= 10;
+                    custKey += tmp - '0';
+                }
+                orderToSegment.put(key, customerToSegment.get(custKey));
+                while (unsafe.getByte(i++) != '\n') ; //skip rest
             }
             return null;
         };
