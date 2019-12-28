@@ -125,6 +125,17 @@ public class Database {
     }
 
 
+    static int parseInt(long i, long end) {
+
+        int q = 0;
+
+        for (byte c = unsafe.getByte(i); c > '9' || c < '1'; c = unsafe.getByte(++i)) ;
+        for (; i < end; ++i) {
+            q *= 10;
+            q += unsafe.getByte(i) - '0'; // - 0
+        }
+        return q;
+    }
 
     PairArr getOrderToSegment(PairArr customerToSegment, MappedByteBuffer orders) {
 
