@@ -195,7 +195,6 @@ public class Database {
         long[] key;
         for (long i = startAddress; i < end; ) {
 
-
             byte tmp;
             int q = 0;
             while ((tmp = unsafe.getByte(i++)) != '|') {
@@ -246,7 +245,6 @@ public class Database {
             tasks.add(() -> calculateSubTask(orderToSegment, startAddress, end, num));
             old = currEnd + 1;
         }
-
 
         try {
             executor.invokeAll(tasks);
