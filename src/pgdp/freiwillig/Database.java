@@ -70,41 +70,41 @@ public class Database {
 
         avgSegment = new HashMap<>();
 
-        int col = 0;
-        long colStart = address;
 
-        int key = 0;
         long end = customer.capacity() + address;
-        for (long i = colStart; i < end; i++) {
-
-            if (unsafe.getByte(i) == '|') {
-
-                if (col == 1) {
-
-                    key = parseInt(colStart, i);
-
-                } else if (col == 6) {
-                    byte[] x = new byte[(int) (i - colStart)];
-                    //customer.get(colStart, x, 0, x.length);
-                    for (int j = 0; j < x.length; ++j)
-                        x[j] = unsafe.getByte(colStart + j);
+        for (long i = address; i < end; ) {
 
 
-                    customerToSegment
-                            .put(key,
-                                    avgSegment.computeIfAbsent(
-                                            new String(x),
-                                            y -> new long[nSolts]));
+            while (unsafe.getByte(i++) != '|') ; //skip 1st
+            i += 9; //skip Customer#
 
-                    while (unsafe.getByte(i) != '\n') ++i;
-                    col = 0;
-                    colStart = i + 1;
-                    continue;
-                }
-                ++col;
-                colStart = i + 1;
-
+            int tmp;
+            int key = 0;
+            while (unsafe.getByte(i++) != '0') ;
+            while ((tmp = unsafe.getByte(i++)) != '|') {
+                key *= 10;
+                key += tmp - '0';
             }
+
+
+            // skip next  4 fields
+            for (int u = 0; u < 4; ++u) {
+                while (unsafe.getByte(i++) != '|') ;
+            }
+
+            //get the market segment and store it in x
+            long j = i;
+            while (unsafe.getByte(j) != '|') ++j;
+            var x = new byte[(int) (j - i)];
+            for (int u = 0; i < j; ) x[u++] = unsafe.getByte(i++);
+
+            customerToSegment
+                    .put(key,
+                            avgSegment.computeIfAbsent(
+                                    new String(x),
+                                    y -> new long[nSolts]));
+
+            while (unsafe.getByte(i++) != '\n') ;// skip rest
 
         }
 
@@ -151,30 +151,22 @@ public class Database {
 
 
         BiFunction<Long, Long, Callable<Object>> f = (s, e) -> () -> {
-            int col = 0;
-            long colStart = s;
 
-            int key = 0;
 
-            for (long i = colStart; i < e; i++) {
-
-                if (unsafe.getByte(i) == '|') {
-
-                    if (col == 0) {
-                        //System.out.println((char)orders[colStart]);
-                        key = parseInt(colStart, i);
-                    } else if (col == 1) {
-
-                        orderToSegment.put(key, customerToSegment.get(parseInt(colStart, i)));
-                        while (unsafe.getByte(i) != '\n') ++i;
-                        col = 0;
-                        colStart = i + 1;
-                        continue;
-                    }
-                    ++col;
-                    colStart = i + 1;
-
+            for (long i = s; i < e; ) {
+                byte tmp;
+                int key = 0;
+                while ((tmp = unsafe.getByte(i++)) != '|') {
+                    key *= 10;
+                    key += tmp - '0';
                 }
+                int q = 0;
+                while ((tmp = unsafe.getByte(i++)) != '|') {
+                    q *= 10;
+                    q += tmp - '0';
+                }
+                orderToSegment.put(key, customerToSegment.get(q));
+                while (unsafe.getByte(i++) != '\n') ;
             }
             return null;
         };
