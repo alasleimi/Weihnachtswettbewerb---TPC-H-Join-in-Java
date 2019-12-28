@@ -264,7 +264,7 @@ public class Database {
             var ch = new FileInputStream(baseDataDirectory.resolve(tableName).toFile()).getChannel();
             //buf.load(); ???
             var buff = ch.map(FileChannel.MapMode.READ_ONLY, 0, ch.size());
-            //buff.load(); pre-load or not?
+            buff.load();
             return buff;
 
         };
