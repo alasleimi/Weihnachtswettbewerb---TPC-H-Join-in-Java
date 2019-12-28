@@ -296,7 +296,7 @@ public class Database {
         long[] count = new long[2];
         for (int i = 0; i < avg.length; ++i)
             count[i & 1] += avg[i];
-        return (100 * count[0]) / count[1];
+        return count[1] == 0 ? 0 : (100 * count[0]) / count[1];
     }
 
     static class PairArr {
@@ -323,7 +323,6 @@ public class Database {
             }
 
         }
-
 
         long[] get(int key) {
             return key < fst.length ? fst[key] : snd[key - fst.length];
