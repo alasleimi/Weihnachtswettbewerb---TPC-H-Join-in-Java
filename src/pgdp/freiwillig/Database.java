@@ -299,7 +299,7 @@ public class Database {
 
     static class PairArr {
         final long[][] fst;
-        ConcurrentHashMap<Integer, long[]> snd;
+        final ConcurrentHashMap<Integer, long[]> snd = new ConcurrentHashMap<>();
 
 
         PairArr(int initSz) {
@@ -310,14 +310,8 @@ public class Database {
             if (key < fst.length) {
                 fst[key] = value;
             } else {
-
-                if (snd == null) {
-                    //System.out.println("allocate second");
-                    snd = new ConcurrentHashMap<>();
-                }
                 snd.put(key, value);
             }
-
         }
 
         long[] get(int key) {
