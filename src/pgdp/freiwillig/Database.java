@@ -13,10 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.function.BiFunction;
 
 
@@ -302,7 +299,7 @@ public class Database {
 
     static class PairArr {
         final long[][] fst;
-        HashMap<Integer, long[]> snd;
+        ConcurrentHashMap<Integer, long[]> snd;
 
 
         PairArr(int initSz) {
@@ -316,7 +313,7 @@ public class Database {
 
                 if (snd == null) {
                     //System.out.println("allocate second");
-                    snd = new HashMap<>();
+                    snd = new ConcurrentHashMap<>();
                 }
                 snd.put(key, value);
             }
