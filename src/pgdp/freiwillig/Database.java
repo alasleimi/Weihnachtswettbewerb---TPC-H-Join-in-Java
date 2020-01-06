@@ -79,7 +79,7 @@ public class Database {
 
                 if (col == 1) {
 
-                    key = parseInt(colStart, i);
+                    key = parseInt(colStart + 8, i);
 
                 } else if (col == 6) {
                     byte[] x = new byte[(int) (i - colStart)];
