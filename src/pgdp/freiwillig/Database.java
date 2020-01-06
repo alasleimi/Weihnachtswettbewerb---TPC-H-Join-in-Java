@@ -301,11 +301,9 @@ public class Database {
 
     static class PairArr {
         final long[][] fst;
-        long[][] snd;
+        HashMap<Integer, long[]> snd;
 
-        // 2 < initSize < INTEGER.MAX_VALUE  - 2
-        // because we can't have an array of size > Max_VALUE - 2;
-        // this class is  made to handle the cases where a key is > Max_VALUE - 3
+
         PairArr(int initSz) {
             fst = new long[initSz][];
         }
@@ -317,15 +315,15 @@ public class Database {
 
                 if (snd == null) {
                     //System.out.println("allocate second");
-                    snd = new long[Integer.MAX_VALUE - fst.length][];
+                    snd = new HashMap<>();
                 }
-                snd[key - fst.length] = value;
+                snd.put(key - fst.length, value);
             }
 
         }
 
         long[] get(int key) {
-            return key < fst.length ? fst[key] : snd[key - fst.length];
+            return key < fst.length ? fst[key] : snd.get(key - fst.length);
         }
 
     }
