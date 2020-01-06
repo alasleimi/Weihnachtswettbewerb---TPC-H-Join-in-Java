@@ -30,7 +30,8 @@ public class Database {
 
     private static boolean cache = false;
     private static Path baseDataDirectory = Paths.get("C:\\Users\\ACER\\Downloads\\data");
-    public static Unsafe unsafe;
+
+    private static Unsafe unsafe;
     private static Method getAddress;
 
     public Database() {
@@ -317,13 +318,13 @@ public class Database {
                     //System.out.println("allocate second");
                     snd = new HashMap<>();
                 }
-                snd.put(key - fst.length, value);
+                snd.put(key, value);
             }
 
         }
 
         long[] get(int key) {
-            return key < fst.length ? fst[key] : snd.get(key - fst.length);
+            return key < fst.length ? fst[key] : snd.get(key);
         }
 
     }
